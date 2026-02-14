@@ -1,0 +1,113 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "voice-to-text",
+  "title": "Voice-to-Text",
+  "description": "Local voice-to-text using MLX models (Whisper or Parakeet)",
+  "icon": "icon.png",
+  "author": "rex",
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "toggle-dictation",
+      "title": "Toggle Dictation",
+      "description": "Start/stop local voice-to-text recording",
+      "mode": "no-view"
+    },
+    {
+      "name": "manage-models",
+      "title": "Manage Models",
+      "description": "View and download voice-to-text models",
+      "mode": "view"
+    },
+    {
+      "name": "manage-post-processing",
+      "title": "Manage Post-Processing",
+      "description": "Configure AI-powered text processors for transcriptions",
+      "mode": "view"
+    },
+    {
+      "name": "manage-dictionary",
+      "title": "Manage Dictionary",
+      "description": "Manage protected terms that are preserved during AI post-processing",
+      "mode": "view"
+    },
+    {
+      "name": "transcription-history",
+      "title": "Transcription History",
+      "description": "View and manage past transcriptions",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "soxPath",
+      "type": "textfield",
+      "title": "Sox Path",
+      "description": "Path to sox binary",
+      "default": "/opt/homebrew/bin/sox",
+      "required": false
+    },
+    {
+      "name": "pythonPath",
+      "type": "textfield",
+      "title": "Python Path",
+      "description": "Path to python3 binary with mlx-whisper or parakeet-mlx installed",
+      "default": "/opt/homebrew/bin/python3",
+      "required": false
+    },
+    {
+      "name": "saveHistory",
+      "type": "checkbox",
+      "title": "Save Transcription History",
+      "description": "Save transcriptions to history for later review",
+      "default": true,
+      "required": false,
+      "label": "Enable"
+    },
+    {
+      "name": "copyToClipboard",
+      "type": "checkbox",
+      "title": "Transcription Output",
+      "description": "Copy transcribed text to clipboard",
+      "default": true,
+      "required": false,
+      "label": "Copy to Clipboard"
+    },
+    {
+      "name": "pasteToActiveApp",
+      "type": "checkbox",
+      "title": "",
+      "description": "Paste transcribed text into the focused text field",
+      "default": true,
+      "required": false,
+      "label": "Paste to Active App"
+    },
+    {
+      "name": "silenceTimeout",
+      "type": "textfield",
+      "title": "Silence Timeout (seconds)",
+      "description": "Auto-stop recording after this many seconds of silence. Set to 0 to disable.",
+      "default": "15",
+      "required": false
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.93.3",
+    "@raycast/utils": "^1.17.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.11",
+    "@types/node": "22.13.4",
+    "eslint": "^8.57.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}
