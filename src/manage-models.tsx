@@ -1,12 +1,30 @@
 import { Action, ActionPanel, Alert, Color, Icon, List, confirmAlert, environment, getPreferenceValues, showToast, Toast } from "@raycast/api";
 import { ChildProcess, execFile, spawn } from "child_process";
-import { rmSync, unlinkSync } from "fs";
-import { join } from "path";
+import { existsSync, rmSync, unlinkSync, writeFileSync } from "fs";
+import { homedir } from "os";
+import { dirname, join } from "path";
 import { useState, useCallback, useRef, useEffect } from "react";
-import { MODELS, modelIdFromValue, modelCacheDir, isModelDownloaded, getActiveModel, setActiveModel, TTS_VOICES, isTtsVoiceDownloaded, getActiveTtsVoice, setActiveTtsVoice, ttsVoicesDir, ttsVoiceOnnxPath, TtsVoice, KOKORO_VOICES, KOKORO_MODEL_ID, isKokoroModelDownloaded, getActiveKokoroVoice, setActiveKokoroVoice, SYSTEM_VOICES, getActiveSystemVoice, setActiveSystemVoice, clearActiveSystemVoice, clearActiveKokoroVoice, clearActiveTtsVoice, ensureDefaultTtsVoice } from "./models";
+import { MODELS, modelIdFromValue, modelCacheDir, isModelDownloaded, getActiveModel, setActiveModel, TTS_VOICES, isTtsVoiceDownloaded, getActiveTtsVoice, setActiveTtsVoice, ttsVoicesDir, ttsVoiceOnnxPath, TtsVoice, KOKORO_VOICES, KOKORO_MODEL_ID, isKokoroModelDownloaded, isKokoroVoiceDownloaded, deleteKokoroVoice, getActiveKokoroVoice, setActiveKokoroVoice, SYSTEM_VOICES, getActiveSystemVoice, setActiveSystemVoice, clearActiveSystemVoice, clearActiveKokoroVoice, clearActiveTtsVoice, ensureDefaultTtsVoice, isPythonPackageInstalled } from "./models";
+import { stopCurrentPlayback, PLAYBACK_PID } from "./read-aloud";
+
+let activePreview: ChildProcess | null = null;
+
+function stopPreview() {
+  if (activePreview) {
+    try { activePreview.kill("SIGKILL"); } catch {}
+    activePreview = null;
+  }
+  stopCurrentPlayback();
+}
 
 interface Preferences {
   pythonPath: string;
+  kokoroPythonPath: string;
+}
+
+function resolveKokoroPython(prefs: Preferences): string {
+  const raw = prefs.kokoroPythonPath || "~/.local/lib-kokoro/venv/bin/python3";
+  return raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
 }
 
 // --- Reusable download hook ---
@@ -127,7 +145,7 @@ function ModelListItem({ itemKey, title, isActive, downloaded, isDownloading, st
           {isDownloading && onCancelDownload && (
             <Action title="Cancel Download" icon={Icon.XMarkCircle} style={Action.Style.Destructive} onAction={onCancelDownload} />
           )}
-          {downloaded && !isActive && onDelete && (
+          {downloaded && onDelete && (
             <Action title="Delete" icon={Icon.Trash} style={Action.Style.Destructive} shortcut={{ modifiers: ["ctrl"], key: "x" }} onAction={onDelete} />
           )}
           {onPreview && (
@@ -184,7 +202,9 @@ function useTtsVoiceStatus() {
 // --- Command ---
 
 export default function Command() {
-  const { pythonPath } = getPreferenceValues<Preferences>();
+  const prefs = getPreferenceValues<Preferences>();
+  const { pythonPath } = prefs;
+  const kokoroPython = resolveKokoroPython(prefs);
 
   const { statuses: sttStatuses, refresh: refreshStt } = useModelStatus();
   const [activeModel, setActiveModelState] = useState<string | undefined>();
@@ -192,15 +212,26 @@ export default function Command() {
 
   const { statuses: piperStatuses, refresh: refreshPiper } = useTtsVoiceStatus();
   const [activePiperVoice, setActivePiperVoiceState] = useState<string | undefined>();
+  const [piperEngineInstalled, setPiperEngineInstalled] = useState<boolean | null>(null);
   const piperDownloader = useDownloader();
 
   const [activeKokoroVoice, setActiveKokoroVoiceState] = useState<string | undefined>();
-  const [kokoroDownloaded, setKokoroDownloaded] = useState(() => isKokoroModelDownloaded());
+  const [kokoroBaseDownloaded, setKokoroBaseDownloaded] = useState(() => isKokoroModelDownloaded());
+  const [kokoroEngineInstalled, setKokoroEngineInstalled] = useState<boolean | null>(null);
+  const [kokoroVoiceStatuses, setKokoroVoiceStatuses] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    for (const v of KOKORO_VOICES) {
+      initial[v.id] = isKokoroVoiceDownloaded(v.id);
+    }
+    return initial;
+  });
   const kokoroDownloader = useDownloader();
 
   const [activeSystemVoice, setActiveSystemVoiceState] = useState<string | undefined>();
 
   useEffect(() => {
+    isPythonPackageInstalled(pythonPath, "piper").then(setPiperEngineInstalled);
+    isPythonPackageInstalled(kokoroPython, "kokoro").then(setKokoroEngineInstalled);
     ensureDefaultTtsVoice().then(() => {
       getActiveModel().then(setActiveModelState);
       getActiveTtsVoice().then(setActivePiperVoiceState);
@@ -233,12 +264,43 @@ export default function Command() {
 
   async function handleSetActivePiper(voiceId: string) {
     await setActiveTtsVoice(voiceId);
+    await clearActiveKokoroVoice();
+    await clearActiveSystemVoice();
     setActivePiperVoiceState(voiceId);
+    setActiveKokoroVoiceState(undefined);
+    setActiveSystemVoiceState(undefined);
     const voice = TTS_VOICES.find((v) => v.id === voiceId);
-    await showToast({ style: Toast.Style.Success, title: `Active Piper voice: ${voice?.title ?? voiceId}` });
+    await showToast({ style: Toast.Style.Success, title: `Active voice: ${voice?.title ?? voiceId}` });
   }
 
-  function handleDownloadPiper(voice: TtsVoice) {
+  async function handleDownloadPiper(voice: TtsVoice) {
+    if (!piperEngineInstalled) {
+      const confirmed = await confirmAlert({
+        title: "Install Piper Voice Engine (~24MB)",
+        message: "Piper needs to be installed before downloading voices.",
+        primaryAction: { title: "Install" },
+      });
+      if (!confirmed) return;
+
+      const toast = await showToast({ style: Toast.Style.Animated, title: "Installing Piper engine..." });
+      try {
+        await new Promise<void>((resolve, reject) => {
+          execFile(pythonPath, ["-m", "pip", "install", "--break-system-packages", "piper-tts"], { timeout: 300_000 }, (error) => {
+            if (error) reject(error);
+            else resolve();
+          });
+        });
+        setPiperEngineInstalled(true);
+        toast.style = Toast.Style.Success;
+        toast.title = "Piper engine installed";
+      } catch (error) {
+        toast.style = Toast.Style.Failure;
+        toast.title = "Engine install failed";
+        toast.message = (error instanceof Error ? error.message : String(error)).slice(0, 120);
+        return;
+      }
+    }
+
     piperDownloader.download(voice.id, voice.id, pythonPath, ["-m", "piper.download_voices", voice.id, "--download-dir", ttsVoicesDir()], {
       timeout: 300_000,
       onSuccess: async () => {
@@ -252,40 +314,113 @@ export default function Command() {
 
   async function handleSetActiveKokoro(voiceId: string) {
     await setActiveKokoroVoice(voiceId);
+    await clearActiveTtsVoice();
+    await clearActiveSystemVoice();
     setActiveKokoroVoiceState(voiceId);
+    setActivePiperVoiceState(undefined);
+    setActiveSystemVoiceState(undefined);
     const voice = KOKORO_VOICES.find((v) => v.id === voiceId);
-    await showToast({ style: Toast.Style.Success, title: `Active Kokoro voice: ${voice?.title ?? voiceId}` });
+    await showToast({ style: Toast.Style.Success, title: `Active voice: ${voice?.title ?? voiceId}` });
   }
 
-  function handleDownloadKokoro() {
-    const script = `from huggingface_hub import snapshot_download; snapshot_download("${KOKORO_MODEL_ID}")`;
-    kokoroDownloader.download("kokoro", "Kokoro model", pythonPath, ["-c", script], {
-      onSuccess: () => setKokoroDownloaded(true),
+  async function handleDownloadKokoroVoice(voiceId: string) {
+    if (!kokoroBaseDownloaded) {
+      const sizeNote = kokoroEngineInstalled
+        ? "To use Kokoro voices, the voice engine needs to be downloaded first (~312MB). This is a one-time download."
+        : "To use Kokoro voices, the Python packages (~50MB) and voice engine (~312MB) need to be installed first. This is a one-time setup.";
+      const confirmed = await confirmAlert({
+        title: "Install Kokoro Voice Engine",
+        message: sizeNote,
+        primaryAction: { title: "Install" },
+      });
+      if (!confirmed) return;
+    }
+
+    if (!kokoroEngineInstalled) {
+      const toast = await showToast({ style: Toast.Style.Animated, title: "Installing Kokoro packages..." });
+      try {
+        if (!existsSync(kokoroPython)) {
+          const venvDir = dirname(dirname(kokoroPython));
+          await new Promise<void>((resolve, reject) => {
+            execFile(pythonPath, ["-m", "venv", venvDir], { timeout: 60_000 }, (error) => {
+              if (error) reject(error);
+              else resolve();
+            });
+          });
+        }
+        await new Promise<void>((resolve, reject) => {
+          execFile(kokoroPython, ["-m", "pip", "install", "kokoro", "soundfile", "numpy"], { timeout: 600_000 }, (error) => {
+            if (error) reject(error);
+            else resolve();
+          });
+        });
+        setKokoroEngineInstalled(true);
+        toast.style = Toast.Style.Success;
+        toast.title = "Kokoro packages installed";
+      } catch (error) {
+        toast.style = Toast.Style.Failure;
+        toast.title = "Package install failed";
+        toast.message = (error instanceof Error ? error.message : String(error)).slice(0, 120);
+        return;
+      }
+    }
+
+    const files = kokoroBaseDownloaded
+      ? [`voices/${voiceId}.pt`]
+      : ["kokoro-v1_0.pth", "config.json", `voices/${voiceId}.pt`];
+    const allowArg = files.map((f) => `"${f}"`).join(", ");
+    const script = `from huggingface_hub import snapshot_download; snapshot_download("${KOKORO_MODEL_ID}", allow_patterns=[${allowArg}])`;
+    const label = kokoroBaseDownloaded ? `Kokoro voice ${voiceId}` : `Kokoro engine + ${voiceId}`;
+    kokoroDownloader.download(`kokoro-${voiceId}`, label, pythonPath, ["-c", script], {
+      onSuccess: () => {
+        setKokoroBaseDownloaded(true);
+        setKokoroVoiceStatuses((prev) => ({ ...prev, [voiceId]: true }));
+      },
     });
   }
 
   // --- Preview handlers ---
 
   function handlePreviewSample(voiceId: string) {
+    stopPreview();
     const samplePath = join(environment.assetsPath, "samples", `${voiceId}.wav`);
-    spawn("afplay", [samplePath], { detached: true, stdio: "ignore" }).unref();
+    const player = spawn("afplay", [samplePath], { detached: true, stdio: "ignore" });
+    activePreview = player;
+    if (player.pid) writeFileSync(PLAYBACK_PID, String(player.pid));
+    player.on("exit", () => {
+      if (activePreview === player) activePreview = null;
+      try { unlinkSync(PLAYBACK_PID); } catch {}
+    });
+    player.unref();
   }
 
   function handlePreviewSystem(voiceId: string) {
-    spawn("say", ["-v", voiceId, "Testing 1, 2, 3"], { detached: true, stdio: "ignore" }).unref();
+    stopPreview();
+    const player = spawn("say", ["-v", voiceId, "Testing 1, 2, 3"], { detached: true, stdio: "ignore" });
+    activePreview = player;
+    if (player.pid) writeFileSync(PLAYBACK_PID, String(player.pid));
+    player.on("exit", () => {
+      if (activePreview === player) activePreview = null;
+      try { unlinkSync(PLAYBACK_PID); } catch {}
+    });
+    player.unref();
   }
 
   // --- System handlers ---
 
   async function handleSetActiveSystem(voiceId: string) {
     await setActiveSystemVoice(voiceId);
+    await clearActiveTtsVoice();
+    await clearActiveKokoroVoice();
     setActiveSystemVoiceState(voiceId);
-    await showToast({ style: Toast.Style.Success, title: `Active system voice: ${voiceId}` });
+    setActivePiperVoiceState(undefined);
+    setActiveKokoroVoiceState(undefined);
+    await showToast({ style: Toast.Style.Success, title: `Active voice: ${voiceId}` });
   }
 
   return (
     <List>
-      <List.Section title="Models" subtitle="Select a downloaded model to use for transcription">
+      <List.Section title="Models" subtitle="Speech-to-text transcription">
       {MODELS.map((m) => (
         <ModelListItem
           key={m.value}
@@ -307,7 +442,7 @@ export default function Command() {
       ))}
       </List.Section>
 
-      <List.Section title="Piper Voices" subtitle="Piper TTS voices for Read Aloud">
+      <List.Section title="Piper Voices" subtitle="Fast, lightweight, CPU-only TTS">
       {TTS_VOICES.map((v) => (
         <ModelListItem
           key={`piper-${v.id}`}
@@ -328,33 +463,85 @@ export default function Command() {
               try { unlinkSync(onnxPath + ".json"); } catch {}
             })) {
               refreshPiper();
+              if (v.id === activePiperVoice) {
+                await clearActiveTtsVoice();
+                setActivePiperVoiceState(undefined);
+                if (!activeSystemVoice) {
+                  await handleSetActiveSystem(SYSTEM_VOICES[0].id);
+                }
+              }
+              const anyRemaining = TTS_VOICES.some((other) => other.id !== v.id && isTtsVoiceDownloaded(other.id));
+              if (!anyRemaining && piperEngineInstalled) {
+                const uninstall = await confirmAlert({
+                  title: "Uninstall Piper Voice Engine?",
+                  message: "No Piper voices remain. Would you also like to uninstall the voice engine (~24MB)?",
+                  primaryAction: { title: "Uninstall", style: Alert.ActionStyle.Destructive },
+                });
+                if (uninstall) {
+                  await new Promise<void>((resolve) => {
+                    execFile(pythonPath, ["-m", "pip", "uninstall", "--break-system-packages", "-y", "piper-tts"], { timeout: 60_000 }, () => resolve());
+                  });
+                  setPiperEngineInstalled(false);
+                }
+              }
             }
           }}
         />
       ))}
       </List.Section>
 
-      <List.Section title="Kokoro Voices" subtitle="High-quality local TTS (~300MB shared model)">
-      {KOKORO_VOICES.map((v) => (
-        <ModelListItem
-          key={`kokoro-${v.id}`}
-          itemKey={`kokoro-${v.id}`}
-          title={v.title}
-          isActive={v.id === activeKokoroVoice}
-          downloaded={kokoroDownloaded}
-          isDownloading={kokoroDownloader.downloadingId !== null}
-          onSetActive={() => handleSetActiveKokoro(v.id)}
-          onUnsetActive={async () => { await clearActiveKokoroVoice(); setActiveKokoroVoiceState(undefined); await showToast({ style: Toast.Style.Success, title: "Kokoro voice unset" }); }}
-          onPreview={() => handlePreviewSample(v.id)}
-          onDownload={handleDownloadKokoro}
-          onCancelDownload={kokoroDownloader.cancel}
-          onDelete={async () => {
-            if (await confirmDelete("Delete Kokoro model?", "This will remove the cached Kokoro model (~300MB) from disk.", () => rmSync(modelCacheDir(KOKORO_MODEL_ID), { recursive: true, force: true }))) {
-              setKokoroDownloaded(false);
-            }
-          }}
-        />
-      ))}
+      <List.Section title="Kokoro Voices" subtitle="High-quality neural TTS">
+      {KOKORO_VOICES.map((v) => {
+        const voiceDownloaded = kokoroVoiceStatuses[v.id] ?? false;
+        const isDownloading = kokoroDownloader.downloadingId === `kokoro-${v.id}`;
+        return (
+          <ModelListItem
+            key={`kokoro-${v.id}`}
+            itemKey={`kokoro-${v.id}`}
+            title={v.title}
+            isActive={v.id === activeKokoroVoice}
+            downloaded={voiceDownloaded}
+            isDownloading={isDownloading}
+            onSetActive={() => handleSetActiveKokoro(v.id)}
+            onUnsetActive={async () => { await clearActiveKokoroVoice(); setActiveKokoroVoiceState(undefined); await showToast({ style: Toast.Style.Success, title: "Kokoro voice unset" }); }}
+            onPreview={() => handlePreviewSample(v.id)}
+            onDownload={() => handleDownloadKokoroVoice(v.id)}
+            onCancelDownload={kokoroDownloader.cancel}
+            onDelete={async () => {
+              const voice = KOKORO_VOICES.find((k) => k.id === v.id);
+              if (await confirmDelete(`Delete ${voice?.title ?? v.id}?`, "This will remove the voice file from disk.", () => deleteKokoroVoice(v.id))) {
+                const updated = { ...kokoroVoiceStatuses, [v.id]: false };
+                setKokoroVoiceStatuses(updated);
+                if (v.id === activeKokoroVoice) {
+                  await clearActiveKokoroVoice();
+                  setActiveKokoroVoiceState(undefined);
+                  if (!activeSystemVoice) {
+                    await handleSetActiveSystem(SYSTEM_VOICES[0].id);
+                  }
+                }
+                const anyRemaining = Object.values(updated).some(Boolean);
+                if (!anyRemaining && kokoroBaseDownloaded) {
+                  const deleteEngine = await confirmAlert({
+                    title: "Uninstall Kokoro Voice Engine?",
+                    message: "No Kokoro voices remain. Would you also like to uninstall the voice engine (~362MB)?",
+                    primaryAction: { title: "Uninstall", style: Alert.ActionStyle.Destructive },
+                  });
+                  if (deleteEngine) {
+                    rmSync(modelCacheDir(KOKORO_MODEL_ID), { recursive: true, force: true });
+                    setKokoroBaseDownloaded(false);
+                    if (kokoroEngineInstalled) {
+                      await new Promise<void>((resolve) => {
+                        execFile(kokoroPython, ["-m", "pip", "uninstall", "-y", "kokoro", "soundfile", "numpy"], { timeout: 60_000 }, () => resolve());
+                      });
+                      setKokoroEngineInstalled(false);
+                    }
+                  }
+                }
+              }
+            }}
+          />
+        );
+      })}
       </List.Section>
 
       <List.Section title="System Voices" subtitle="macOS built-in voices for Read Aloud">

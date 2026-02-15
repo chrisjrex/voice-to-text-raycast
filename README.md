@@ -16,9 +16,8 @@ brew install sox
 pip3 install mlx-whisper    # multilingual
 pip3 install parakeet-mlx   # English-only, generally faster
 
-# Text-to-speech — pick one (or skip for macOS system voices):
-pip3 install kokoro soundfile numpy   # best quality, neural TTS
-pip3 install piper-tts                # lightweight, CPU-only
+# Text-to-speech packages are auto-installed on first voice download
+# (or skip TTS entirely and use macOS system voices)
 ```
 
 Then in Raycast:
@@ -81,11 +80,9 @@ Available voices: Samantha, Alex, Daniel, Karen, Moira, Tessa, Fiona, Veena.
 
 82M-parameter neural TTS. Runs a local Python server with 2-minute idle auto-shutdown.
 
-```bash
-pip3 install kokoro soundfile numpy
-```
+Voices are downloaded individually (~500KB each). The first voice you download will also install the Python packages (`kokoro`, `soundfile`, `numpy`, ~50MB) and fetch the Kokoro voice engine (~312MB) — this is a one-time setup shared by all voices. 21 voices available across US and British English, male and female.
 
-The shared model (~300 MB) downloads automatically when you select a Kokoro voice. 21 voices available across US and British English, male and female.
+If the last Kokoro voice is deleted, you'll be offered the option to uninstall the engine and Python packages.
 
 Use **Toggle Kokoro Server** to manually start/stop the server, or let it start automatically on first use.
 
@@ -93,11 +90,9 @@ Use **Toggle Kokoro Server** to manually start/stop the server, or let it start 
 
 Fast open-source voice synthesizer from [Rhasspy](https://github.com/rhasspy/piper).
 
-```bash
-pip3 install piper-tts
-```
+Voices are downloaded individually (~60MB each). The first voice you download will also install `piper-tts` (~24MB) — this is a one-time install shared by all voices. 5 voices available across US and British English, male and female.
 
-Each voice is ~60 MB. Available voices: Amy, Lessac, Ryan (US), Alba, Alan (British).
+If the last Piper voice is deleted, you'll be offered the option to uninstall the engine.
 
 ---
 
@@ -112,3 +107,17 @@ Each voice is ~60 MB. Available voices: Amy, Lessac, Ryan (US), Alba, Alan (Brit
 | Copy to Clipboard | Enabled | Copy transcribed text to clipboard |
 | Paste to Active App | Enabled | Paste transcribed text into the focused text field |
 | Silence Timeout | 15 seconds | Auto-stop after this many seconds of silence (0 to disable) |
+
+---
+
+## Additional Information
+
+### Downloading all Kokoro voices at once
+
+By default, Kokoro voices are downloaded individually. If you'd prefer to download the model and all voices in one go, you can use `snapshot_download` directly:
+
+```bash
+python3 -c 'from huggingface_hub import snapshot_download; snapshot_download("hexgrad/Kokoro-82M")'
+```
+
+This downloads the full repository (~347MB) including all 53 voice files. The voices will then show as downloaded in **Manage Models**.

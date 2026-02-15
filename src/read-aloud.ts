@@ -171,7 +171,7 @@ function stopKokoroServer(): void {
 export { KOKORO_PID, KOKORO_SOCK, isKokoroServerRunning, startKokoroServer, stopKokoroServer, resolveKokoroPython, buildKokoroServerScript };
 export type { Preferences as ReadAloudPreferences };
 
-const PLAYBACK_PID = join(environment.supportPath, "tts_playback.pid");
+export const PLAYBACK_PID = join(environment.supportPath, "tts_playback.pid");
 
 function isPlaying(): boolean {
   try {
@@ -183,7 +183,7 @@ function isPlaying(): boolean {
   }
 }
 
-function stopCurrentPlayback(): void {
+export function stopCurrentPlayback(): void {
   try {
     const pid = Number(readFileSync(PLAYBACK_PID, "utf-8").trim());
     process.kill(pid, "SIGTERM");

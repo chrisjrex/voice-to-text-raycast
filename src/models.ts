@@ -1,5 +1,6 @@
 import { LocalStorage, environment } from "@raycast/api";
-import { existsSync, readdirSync } from "fs";
+import { execFile } from "child_process";
+import { existsSync, readlinkSync, readdirSync, unlinkSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -66,6 +67,14 @@ export function ttsVoiceOnnxPath(voiceId: string): string {
   return join(ttsVoicesDir(), `${voiceId}.onnx`);
 }
 
+export function isPythonPackageInstalled(pythonPath: string, moduleName: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile(pythonPath, ["-c", `import ${moduleName}`], { timeout: 10_000 }, (error) => {
+      resolve(!error);
+    });
+  });
+}
+
 export function isTtsVoiceDownloaded(voiceId: string): boolean {
   return existsSync(ttsVoiceOnnxPath(voiceId)) && existsSync(join(ttsVoicesDir(), `${voiceId}.onnx.json`));
 }
@@ -82,8 +91,37 @@ export async function setActiveTtsVoice(voiceId: string): Promise<void> {
 
 export const KOKORO_MODEL_ID = "hexgrad/Kokoro-82M";
 
+export function kokoroSnapshotDir(): string | undefined {
+  const snapshots = join(modelCacheDir(KOKORO_MODEL_ID), "snapshots");
+  try {
+    const dirs = readdirSync(snapshots);
+    return dirs.length > 0 ? join(snapshots, dirs[0]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function isKokoroModelDownloaded(): boolean {
-  return isModelDownloaded(KOKORO_MODEL_ID);
+  const snap = kokoroSnapshotDir();
+  if (!snap) return false;
+  return existsSync(join(snap, "kokoro-v1_0.pth"));
+}
+
+export function isKokoroVoiceDownloaded(voiceId: string): boolean {
+  const snap = kokoroSnapshotDir();
+  if (!snap) return false;
+  return existsSync(join(snap, "voices", `${voiceId}.pt`));
+}
+
+export function deleteKokoroVoice(voiceId: string): void {
+  const snap = kokoroSnapshotDir();
+  if (!snap) return;
+  const voicePath = join(snap, "voices", `${voiceId}.pt`);
+  try {
+    const blobPath = readlinkSync(voicePath);
+    try { unlinkSync(join(snap, "voices", blobPath)); } catch {}
+  } catch {}
+  try { unlinkSync(voicePath); } catch {}
 }
 
 const ACTIVE_KOKORO_VOICE_KEY = "active_kokoro_voice";
