@@ -8,6 +8,10 @@
 /* eslint-disable @typescript-eslint/ban-types */
 
 type ExtensionPreferences = {
+  /** TTS Engine - Read transcribed text aloud after dictation. Piper needs: pip install piper-tts. Kokoro needs: pip install kokoro */
+  "ttsEngine": "none" | "piper" | "kokoro",
+  /** TTS Voice / Model - Piper: path to .onnx voice model file. Kokoro: voice name (e.g. af_heart) */
+  "ttsVoice": string,
   /** Sox Path - Path to sox binary */
   "soxPath": string,
   /** Python Path - Path to python3 binary with mlx-whisper or parakeet-mlx installed */
@@ -36,6 +40,8 @@ declare namespace Preferences {
   export type ManageDictionary = ExtensionPreferences & {}
   /** Preferences accessible in the `transcription-history` command */
   export type TranscriptionHistory = ExtensionPreferences & {}
+  /** Preferences accessible in the `read-aloud` command */
+  export type ReadAloud = ExtensionPreferences & {}
 }
 
 declare namespace Arguments {
@@ -49,5 +55,7 @@ declare namespace Arguments {
   export type ManageDictionary = {}
   /** Arguments passed to the `transcription-history` command */
   export type TranscriptionHistory = {}
+  /** Arguments passed to the `read-aloud` command */
+  export type ReadAloud = {}
 }
 

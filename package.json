@@ -36,9 +36,36 @@
       "title": "Transcription History",
       "description": "View and manage past transcriptions",
       "mode": "view"
+    },
+    {
+      "name": "read-aloud",
+      "title": "Read Aloud",
+      "description": "Read clipboard text aloud using Piper or Kokoro TTS",
+      "mode": "no-view"
     }
   ],
   "preferences": [
+    {
+      "name": "ttsEngine",
+      "type": "dropdown",
+      "title": "TTS Engine",
+      "description": "Read transcribed text aloud after dictation. Piper needs: pip install piper-tts. Kokoro needs: pip install kokoro",
+      "required": false,
+      "default": "none",
+      "data": [
+        { "title": "None (no playback)", "value": "none" },
+        { "title": "Piper (fast, CPU, CLI)", "value": "piper" },
+        { "title": "Kokoro (82M params, Python)", "value": "kokoro" }
+      ]
+    },
+    {
+      "name": "ttsVoice",
+      "type": "textfield",
+      "title": "TTS Voice / Model",
+      "description": "Piper: path to .onnx voice model file. Kokoro: voice name (e.g. af_heart)",
+      "required": false,
+      "default": ""
+    },
     {
       "name": "soxPath",
       "type": "textfield",
