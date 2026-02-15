@@ -1,6 +1,7 @@
 import { Action, ActionPanel, Alert, Color, confirmAlert, Icon, List, showHUD } from "@raycast/api";
 import { useState } from "react";
 import { HistoryEntry, loadHistory, saveHistory } from "./history";
+import { MODELS } from "./models";
 import { speakText } from "./read-aloud";
 
 function formatDate(timestamp: number): string {
@@ -9,6 +10,10 @@ function formatDate(timestamp: number): string {
 
 function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max) + "..." : text;
+}
+
+function modelDisplayName(value: string): string {
+  return MODELS.find((m) => m.value === value)?.title ?? value;
 }
 
 export default function TranscriptionHistory() {
@@ -58,6 +63,19 @@ export default function TranscriptionHistory() {
                   <List.Item.Detail.Metadata>
                     <List.Item.Detail.Metadata.Label title="Transcribed On" text={formatDate(entry.timestamp)} />
                     <List.Item.Detail.Metadata.Label title="Characters" text={String(entry.text.length)} />
+                    {entry.model && (
+                      <List.Item.Detail.Metadata.Label title="Model" text={modelDisplayName(entry.model)} />
+                    )}
+                    {entry.postProcessors && entry.postProcessors.length > 0 && (
+                      <>
+                        <List.Item.Detail.Metadata.Separator />
+                        <List.Item.Detail.Metadata.TagList title="Post-Processing">
+                          {entry.postProcessors.map((name) => (
+                            <List.Item.Detail.Metadata.TagList.Item key={name} text={name} color={Color.Blue} />
+                          ))}
+                        </List.Item.Detail.Metadata.TagList>
+                      </>
+                    )}
                   </List.Item.Detail.Metadata>
                 }
               />

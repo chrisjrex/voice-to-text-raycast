@@ -89,10 +89,15 @@ export async function hasEnabledProcessors(): Promise<boolean> {
   return processors.some((p) => p.enabled);
 }
 
-export async function runPostProcessing(text: string): Promise<string> {
+export interface PostProcessingResult {
+  text: string;
+  appliedProcessors: string[];
+}
+
+export async function runPostProcessing(text: string): Promise<PostProcessingResult> {
   const processors = await loadProcessors();
   const enabled = processors.filter((p) => p.enabled);
-  if (enabled.length === 0) return text;
+  if (enabled.length === 0) return { text, appliedProcessors: [] };
 
   const instructions = enabled.map((p, i) => `${i + 1}. ${getEffectivePrompt(p)}`).join("\n");
 
@@ -109,5 +114,6 @@ Return ONLY the processed text, nothing else.
 
 Text: """${text}"""`;
 
-  return await AI.ask(prompt, { creativity: "low" });
+  const result = await AI.ask(prompt, { creativity: "low" });
+  return { text: result, appliedProcessors: enabled.map((p) => getEffectiveName(p)) };
 }

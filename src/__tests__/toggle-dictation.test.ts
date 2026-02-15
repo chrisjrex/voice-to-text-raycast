@@ -19,7 +19,7 @@ vi.mock("../transcribe", () => ({
 }));
 vi.mock("../post-processors", () => ({
   hasEnabledProcessors: vi.fn(async () => false),
-  runPostProcessing: vi.fn((text: string) => Promise.resolve(text)),
+  runPostProcessing: vi.fn((text: string) => Promise.resolve({ text, appliedProcessors: [] })),
 }));
 vi.mock("../history", () => ({
   addHistoryEntry: vi.fn(),
@@ -83,6 +83,7 @@ describe("toggle-dictation Command", () => {
     vi.mocked(getActiveModel).mockResolvedValue("whisper:mlx-community/whisper-tiny");
     vi.mocked(parseModel).mockReturnValue({ provider: "whisper", modelId: "mlx-community/whisper-tiny" });
     vi.mocked(isModelDownloaded).mockReturnValue(true);
+    vi.mocked(runPostProcessing).mockImplementation(async (text: string) => ({ text, appliedProcessors: [] }));
     mockExecFileSuccess();
   });
 
@@ -166,7 +167,7 @@ describe("toggle-dictation Command", () => {
     vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
     vi.mocked(transcribe).mockResolvedValue("raw text");
     vi.mocked(hasEnabledProcessors).mockResolvedValue(true);
-    vi.mocked(runPostProcessing).mockResolvedValue("processed text");
+    vi.mocked(runPostProcessing).mockResolvedValue({ text: "processed text", appliedProcessors: ["Fix Grammar"] });
 
     await runCommand();
 
@@ -195,7 +196,7 @@ describe("toggle-dictation Command", () => {
 
     await runCommand();
 
-    expect(addHistoryEntry).toHaveBeenCalledWith("saved text");
+    expect(addHistoryEntry).toHaveBeenCalledWith("saved text", { model: "whisper:mlx-community/whisper-tiny", postProcessors: [] });
   });
 
   it("handles dead recorder PID with existing audio file by auto-transcribing", async () => {

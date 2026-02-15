@@ -119,7 +119,7 @@ async function startRecording(soxPath: string, silenceTimeout: number): Promise<
   await showHUD("🎙 Recording...");
 }
 
-async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: string, provider: string, modelId: string, saveHistoryEnabled: boolean, copyToClipboardEnabled: boolean, pasteToActiveAppEnabled: boolean): Promise<void> {
+async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: string, provider: string, modelId: string, model: string, saveHistoryEnabled: boolean, copyToClipboardEnabled: boolean, pasteToActiveAppEnabled: boolean): Promise<void> {
   try { process.kill(pid, "SIGTERM"); } catch {}
 
   const monitorPid = await LocalStorage.getItem<string>(STORAGE_KEY_MONITOR_PID);
@@ -165,8 +165,8 @@ async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: str
         await updateCommandMetadata({ subtitle: "Processing..." });
         await showHUD("Processing...");
       }
-      const processed = await runPostProcessing(text);
-      if (saveHistoryEnabled) addHistoryEntry(processed);
+      const { text: processed, appliedProcessors } = await runPostProcessing(text);
+      if (saveHistoryEnabled) addHistoryEntry(processed, { model, postProcessors: appliedProcessors });
       if (copyToClipboardEnabled) await Clipboard.copy(processed);
       if (pasteToActiveAppEnabled) await Clipboard.paste(processed);
       const preview = processed.length > 60 ? processed.slice(0, 60) + "..." : processed;
@@ -219,7 +219,7 @@ export default async function Command() {
       if (existsSync(storedAudio) && statSync(storedAudio).size >= 1000) {
         await LocalStorage.removeItem(STORAGE_KEY_PID);
         await LocalStorage.removeItem(STORAGE_KEY_AUDIO);
-        await stopAndTranscribe(pid, storedAudio, pythonPath, provider, modelId, saveHistoryEnabled, copyToClipboardEnabled, pasteToActiveAppEnabled);
+        await stopAndTranscribe(pid, storedAudio, pythonPath, provider, modelId, model, saveHistoryEnabled, copyToClipboardEnabled, pasteToActiveAppEnabled);
       } else {
         await LocalStorage.removeItem(STORAGE_KEY_PID);
         await LocalStorage.removeItem(STORAGE_KEY_AUDIO);
@@ -230,7 +230,7 @@ export default async function Command() {
       return;
     }
 
-    await stopAndTranscribe(pid, storedAudio, pythonPath, provider, modelId, saveHistoryEnabled, copyToClipboardEnabled, pasteToActiveAppEnabled);
+    await stopAndTranscribe(pid, storedAudio, pythonPath, provider, modelId, model, saveHistoryEnabled, copyToClipboardEnabled, pasteToActiveAppEnabled);
   } else {
     await startRecording(soxPath, silenceTimeout);
   }

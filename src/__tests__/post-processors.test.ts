@@ -42,7 +42,8 @@ describe("loadProcessors", () => {
 describe("runPostProcessing", () => {
   it("returns text unchanged when nothing is enabled", async () => {
     const result = await runPostProcessing("hello world");
-    expect(result).toBe("hello world");
+    expect(result.text).toBe("hello world");
+    expect(result.appliedProcessors).toEqual([]);
   });
 
   it("sends enabled processor instructions to AI", async () => {
