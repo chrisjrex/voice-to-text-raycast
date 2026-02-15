@@ -1,4 +1,4 @@
-import { AI, LocalStorage } from "@raycast/api";
+import { AI, LocalStorage, getPreferenceValues } from "@raycast/api";
 import { loadDictionary } from "./dictionary";
 
 export interface PostProcessor {
@@ -114,6 +114,8 @@ Return ONLY the processed text, nothing else.
 
 Text: """${text}"""`;
 
-  const result = await AI.ask(prompt, { creativity: "low" });
+  const { aiModel } = getPreferenceValues<{ aiModel?: string }>();
+  const model = aiModel ? AI.Model[aiModel as keyof typeof AI.Model] : undefined;
+  const result = await AI.ask(prompt, { creativity: "low", ...(model && { model }) });
   return { text: result, appliedProcessors: enabled.map((p) => getEffectiveName(p)) };
 }
