@@ -12,7 +12,7 @@ interface Preferences {
   kokoroPythonPath: string;
 }
 
-const KOKORO_SOCK = `/tmp/kokoro_tts_${process.getuid()}.sock`;
+const KOKORO_SOCK = `/tmp/kokoro_tts_${process.getuid?.() ?? 0}.sock`;
 const KOKORO_PID = join(environment.supportPath, "kokoro_server.pid");
 const KOKORO_SERVER_SCRIPT = join(environment.supportPath, "kokoro_server.py");
 

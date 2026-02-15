@@ -12,7 +12,7 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { useState, useCallback } from "react";
-import { PostProcessor, loadProcessors, saveProcessors } from "./post-processors";
+import { PostProcessor, loadProcessors, saveProcessors, getEffectiveName, getEffectivePrompt, isCustomized } from "./post-processors";
 
 function useProcessors() {
   const [processors, setProcessors] = useState<PostProcessor[]>([]);
@@ -69,7 +69,7 @@ function ProcessorForm({
         id="name"
         title="Name"
         placeholder="My Processor"
-        defaultValue={processor?.name ?? ""}
+        defaultValue={processor ? getEffectiveName(processor) : ""}
         error={nameError}
         onChange={() => nameError && setNameError(undefined)}
       />
@@ -77,7 +77,7 @@ function ProcessorForm({
         id="prompt"
         title="Prompt"
         placeholder="Describe the transformation to apply..."
-        defaultValue={processor?.prompt ?? ""}
+        defaultValue={processor ? getEffectivePrompt(processor) : ""}
         error={promptError}
         onChange={() => promptError && setPromptError(undefined)}
       />
@@ -140,7 +140,17 @@ export default function Command() {
       <ProcessorForm
         processor={processor}
         onSave={async (name, prompt) => {
-          const updated = processors.map((p) => (p.id === processor.id ? { ...p, name, prompt } : p));
+          const updated = processors.map((p) => {
+            if (p.id !== processor.id) return p;
+            if (p.builtin) {
+              return {
+                ...p,
+                customName: name !== p.name ? name : undefined,
+                customPrompt: prompt !== p.prompt ? prompt : undefined,
+              };
+            }
+            return { ...p, name, prompt };
+          });
           await saveProcessors(updated);
           await refresh();
           await showToast({ style: Toast.Style.Success, title: `Updated "${name}"` });
@@ -149,21 +159,34 @@ export default function Command() {
     );
   }
 
+  async function resetProcessor(processor: PostProcessor) {
+    const updated = processors.map((p) =>
+      p.id === processor.id ? { ...p, customName: undefined, customPrompt: undefined } : p,
+    );
+    await saveProcessors(updated);
+    await refresh();
+    await showToast({ style: Toast.Style.Success, title: `Reset "${processor.name}" to default` });
+  }
+
+  function getTag(p: PostProcessor): { value: string; color: Color } {
+    if (!p.builtin) return { value: "Custom", color: Color.Purple };
+    if (isCustomized(p)) return { value: "Customized", color: Color.Orange };
+    return { value: "Built-in", color: Color.Blue };
+  }
+
   return (
-    <List isLoading={isLoading}>
+    <List isLoading={isLoading} isShowingDetail>
       {processors.map((p, index) => (
         <List.Item
           key={p.id}
-          title={p.name}
-          subtitle={p.prompt}
+          title={getEffectiveName(p)}
           accessories={[
             p.enabled
               ? { icon: { source: Icon.CheckCircle, tintColor: Color.Green }, tooltip: "Enabled" }
               : { icon: { source: Icon.Circle, tintColor: Color.SecondaryText }, tooltip: "Disabled" },
-            p.builtin
-              ? { tag: { value: "Built-in", color: Color.Blue } }
-              : { tag: { value: "Custom", color: Color.Purple } },
+            { tag: getTag(p) },
           ]}
+          detail={<List.Item.Detail markdown={getEffectivePrompt(p)} />}
           actions={
             <ActionPanel>
               <Action
@@ -172,8 +195,9 @@ export default function Command() {
                 onAction={() => toggle(p)}
               />
               <Action title="Create Custom Processor" icon={Icon.Plus} shortcut={{ modifiers: ["cmd"], key: "n" }} onAction={openCreateForm} />
-              {!p.builtin && (
-                <Action title="Edit" icon={Icon.Pencil} shortcut={{ modifiers: ["cmd"], key: "e" }} onAction={() => openEditForm(p)} />
+              <Action title="Edit" icon={Icon.Pencil} shortcut={{ modifiers: ["cmd"], key: "e" }} onAction={() => openEditForm(p)} />
+              {isCustomized(p) && (
+                <Action title="Reset to Default" icon={Icon.RotateAntiClockwise} onAction={() => resetProcessor(p)} />
               )}
               {!p.builtin && (
                 <Action

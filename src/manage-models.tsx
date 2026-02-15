@@ -36,7 +36,7 @@ function useDownloader() {
       toast.title = `Downloaded ${label}`;
       await opts.onSuccess?.();
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).killed) {
+      if ((error as NodeJS.ErrnoException & { killed?: boolean }).killed) {
         toast.style = Toast.Style.Success;
         toast.title = "Download cancelled";
       } else {

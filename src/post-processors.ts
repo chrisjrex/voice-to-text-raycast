@@ -7,6 +7,20 @@ export interface PostProcessor {
   prompt: string;
   enabled: boolean;
   builtin: boolean;
+  customName?: string;
+  customPrompt?: string;
+}
+
+export function getEffectiveName(p: PostProcessor): string {
+  return p.customName ?? p.name;
+}
+
+export function getEffectivePrompt(p: PostProcessor): string {
+  return p.customPrompt ?? p.prompt;
+}
+
+export function isCustomized(p: PostProcessor): boolean {
+  return p.builtin && (p.customName != null || p.customPrompt != null);
 }
 
 const STORAGE_KEY = "post_processors";
@@ -43,7 +57,7 @@ const BUILTIN_PROCESSORS: PostProcessor[] = [
   {
     id: "builtin-pirate",
     name: "Pirate",
-    prompt: "Transform into pirate speak, using playful and colorful language typical of a pirate's lingo. Incorporate terms like \"ahoy,\" \"matey,\" \"yarrr,\" and other nautical phrases. Maintain the essence of the original text while giving it a swashbuckling twist!",
+    prompt: "Transform into pirate speak, using playful and colorful language typical of a pirate's lingo. Maintain the essence of the original text while giving it a swashbuckling twist!",
     enabled: false,
     builtin: true,
   },
@@ -80,7 +94,7 @@ export async function runPostProcessing(text: string): Promise<string> {
   const enabled = processors.filter((p) => p.enabled);
   if (enabled.length === 0) return text;
 
-  const instructions = enabled.map((p, i) => `${i + 1}. ${p.prompt}`).join("\n");
+  const instructions = enabled.map((p, i) => `${i + 1}. ${getEffectivePrompt(p)}`).join("\n");
 
   const dictionary = await loadDictionary();
   const dictionaryClause =
