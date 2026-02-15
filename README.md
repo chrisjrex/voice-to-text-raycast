@@ -6,6 +6,8 @@ Local voice-to-text and text-to-speech for Raycast. Everything runs on-device â€
 
 ## Installation
 
+> **Installing from source?** See [INSTALL.md](INSTALL.md) for developer setup instructions.
+
 ```bash
 # Recording (required for dictation)
 brew install sox
