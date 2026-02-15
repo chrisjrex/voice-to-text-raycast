@@ -9,7 +9,7 @@
   "commands": [
     {
       "name": "toggle-dictation",
-      "title": "Toggle Dictation",
+      "title": "Transcribe",
       "description": "Start/stop local voice-to-text recording",
       "mode": "no-view"
     },
