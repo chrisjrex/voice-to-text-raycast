@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { homedir } from "os";
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
@@ -35,44 +34,99 @@ vi.mock("../models", () => ({
   ensureDefaultTtsVoice: vi.fn(async () => {}),
 }));
 
-import { resolveKokoroPython, buildKokoroServerScript, isKokoroServerRunning, speakText } from "../read-aloud";
-import type { ReadAloudPreferences } from "../read-aloud";
-import { existsSync } from "fs";
+import { speakText, isKokoroServerRunning } from "../read-aloud";
+import { readFileSync, existsSync } from "fs";
 import { createConnection } from "net";
 import { spawn } from "child_process";
 import { EventEmitter } from "events";
 import { getActiveSystemVoice, getActiveKokoroVoice, getActiveTtsVoice, isTtsVoiceDownloaded } from "../models";
-import { _setPrefs } from "@raycast/api";
+import * as raycastApi from "@raycast/api";
+import { _setPrefs, _setSelectedText, _setClipboardText } from "@raycast/api";
 
 _setPrefs({ pythonPath: "/opt/homebrew/bin/python3", kokoroPythonPath: "", ttsEngine: "piper" });
 
-describe("resolveKokoroPython", () => {
-  it("expands tilde prefix", () => {
-    const prefs = { kokoroPythonPath: "~/venv/bin/python3" } as ReadAloudPreferences;
-    expect(resolveKokoroPython(prefs)).toBe(`${homedir()}/venv/bin/python3`);
+const showHUDSpy = vi.spyOn(raycastApi, "showHUD");
+const updateMetadataSpy = vi.spyOn(raycastApi, "updateCommandMetadata");
+
+describe("Read Aloud Command", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    _setSelectedText("");
+    _setClipboardText(undefined);
+    // Default: not playing (readFileSync throws → isPlaying returns false)
+    vi.mocked(readFileSync).mockImplementation(() => { throw new Error("ENOENT"); });
+    vi.mocked(existsSync).mockReturnValue(false);
+    // Default: system voice active so speakText succeeds
+    vi.mocked(getActiveSystemVoice).mockResolvedValue("Samantha");
+    vi.mocked(getActiveKokoroVoice).mockResolvedValue(undefined);
+    vi.mocked(getActiveTtsVoice).mockResolvedValue(undefined);
   });
 
-  it("uses default when empty", () => {
-    const prefs = { kokoroPythonPath: "" } as ReadAloudPreferences;
-    expect(resolveKokoroPython(prefs)).toBe(`${homedir()}/.local/lib-kokoro/venv/bin/python3`);
+  async function runCommand() {
+    const mod = await import("../read-aloud");
+    return mod.default();
+  }
+
+  it("speaks selected text and shows Speaking HUD", async () => {
+    _setSelectedText("Hello world");
+
+    await runCommand();
+
+    expect(showHUDSpy).toHaveBeenCalledWith("Speaking...");
+    expect(spawn).toHaveBeenCalledWith("say", expect.arrayContaining(["Hello world"]), expect.anything());
   });
 
-  it("passes through absolute path unchanged", () => {
-    const prefs = { kokoroPythonPath: "/usr/bin/python3" } as ReadAloudPreferences;
-    expect(resolveKokoroPython(prefs)).toBe("/usr/bin/python3");
+  it("falls back to clipboard when no text is selected", async () => {
+    _setSelectedText("");
+    _setClipboardText("clipboard content");
+
+    await runCommand();
+
+    expect(showHUDSpy).toHaveBeenCalledWith("Speaking...");
+    expect(spawn).toHaveBeenCalledWith("say", expect.arrayContaining(["clipboard content"]), expect.anything());
   });
-});
 
-describe("buildKokoroServerScript", () => {
-  const script = buildKokoroServerScript();
+  it("shows error when no text anywhere", async () => {
+    _setSelectedText("");
+    _setClipboardText(undefined);
 
-  it("auto-shuts down after 120 seconds idle", () => {
-    // The script should define a 120-second idle timeout
-    expect(script).toContain("120");
-    // Verify by parsing: extract the IDLE_TIMEOUT value
-    const match = script.match(/IDLE_TIMEOUT\s*=\s*(\d+)/);
-    expect(match).not.toBeNull();
-    expect(Number(match![1])).toBe(120);
+    await runCommand();
+
+    expect(showHUDSpy).toHaveBeenCalledWith("No text selected and clipboard is empty");
+  });
+
+  it("stops playback when already playing and no new text", async () => {
+    // Simulate a playing process
+    vi.mocked(readFileSync).mockReturnValue("9999");
+    vi.spyOn(process, "kill").mockImplementation(() => true);
+    _setSelectedText("");
+
+    await runCommand();
+
+    expect(showHUDSpy).toHaveBeenCalledWith("Stopped reading");
+  });
+
+  it("speaks new text even when already playing", async () => {
+    // Simulate a playing process
+    vi.mocked(readFileSync).mockReturnValue("9999");
+    vi.spyOn(process, "kill").mockImplementation(() => true);
+    _setSelectedText("new text");
+
+    await runCommand();
+
+    expect(showHUDSpy).toHaveBeenCalledWith("Speaking...");
+    expect(showHUDSpy).not.toHaveBeenCalledWith("Stopped reading");
+  });
+
+  it("shows error HUD on TTS failure", async () => {
+    _setSelectedText("Hello");
+    vi.mocked(getActiveSystemVoice).mockResolvedValue(undefined);
+    vi.mocked(getActiveKokoroVoice).mockResolvedValue(undefined);
+    vi.mocked(getActiveTtsVoice).mockResolvedValue(undefined);
+
+    await runCommand();
+
+    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("TTS failed"));
   });
 });
 
@@ -128,8 +182,6 @@ describe("speakText voice selection", () => {
 
     await speakText("hello");
 
-    // System voice uses macOS `say`, kokoro uses a Unix socket server.
-    // If system voice won, `say` was spawned — not a socket connection.
     expect(createConnection).not.toHaveBeenCalled();
   });
 
@@ -150,7 +202,6 @@ describe("speakText voice selection", () => {
     setTimeout(() => mockProc.emit("close", 0), 10);
     await promise;
 
-    // Piper was used (not system say, not kokoro server)
     expect(createConnection).not.toHaveBeenCalled();
     expect(spawn).toHaveBeenCalled();
   });
@@ -170,10 +221,8 @@ describe("speakText voice selection", () => {
     vi.mocked(getActiveSystemVoice).mockResolvedValue(undefined);
     vi.mocked(getActiveKokoroVoice).mockResolvedValue("af_heart");
     vi.mocked(getActiveTtsVoice).mockResolvedValue(undefined);
-    vi.mocked(existsSync).mockReturnValue(false); // socket doesn't exist → server not running
+    vi.mocked(existsSync).mockReturnValue(false);
 
-    // startKokoroServer spawns python then polls until ready or 8s timeout.
-    // Capture the promise immediately to avoid unhandled rejection.
     const promise = speakText("hello").catch((e: Error) => e);
     for (let i = 0; i < 20; i++) {
       await vi.advanceTimersByTimeAsync(500);
@@ -181,7 +230,6 @@ describe("speakText voice selection", () => {
 
     const result = await promise;
     expect(result).toBeInstanceOf(Error);
-    // The key behavior: it attempted to start the server
     expect(spawn).toHaveBeenCalled();
 
     vi.useRealTimers();

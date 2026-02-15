@@ -29,12 +29,21 @@ export function getPreferenceValues<T>(): T {
 export function _setPrefs(prefs: Record<string, unknown>): void {
   _prefs = prefs;
 }
+let _selectedText: string | (() => string) = "";
 export async function getSelectedText(): Promise<string> {
-  return "";
+  if (typeof _selectedText === "function") return _selectedText();
+  return _selectedText;
+}
+export function _setSelectedText(text: string | (() => string)): void {
+  _selectedText = text;
 }
 
+let _clipboardText: string | undefined;
 export const Clipboard = {
-  readText: async (): Promise<string | undefined> => undefined,
+  readText: async (): Promise<string | undefined> => _clipboardText,
   copy: async (_text: string): Promise<void> => {},
   paste: async (_text: string): Promise<void> => {},
 };
+export function _setClipboardText(text: string | undefined): void {
+  _clipboardText = text;
+}

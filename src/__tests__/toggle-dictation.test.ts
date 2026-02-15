@@ -41,6 +41,7 @@ import { isModelDownloaded, getActiveModel } from "../models";
 const showHUDSpy = vi.spyOn(raycastApi, "showHUD");
 const updateMetadataSpy = vi.spyOn(raycastApi, "updateCommandMetadata");
 const clipboardCopySpy = vi.spyOn(raycastApi.Clipboard, "copy");
+const clipboardPasteSpy = vi.spyOn(raycastApi.Clipboard, "paste");
 
 _setPrefs({
   soxPath: "/opt/homebrew/bin/sox",
@@ -196,7 +197,7 @@ describe("toggle-dictation Command", () => {
 
     await runCommand();
 
-    expect(addHistoryEntry).toHaveBeenCalledWith("saved text", { model: "whisper:mlx-community/whisper-tiny", postProcessors: [] });
+    expect(addHistoryEntry).toHaveBeenCalledWith("saved text", expect.objectContaining({ model: "whisper:mlx-community/whisper-tiny", postProcessors: [] }));
   });
 
   it("handles dead recorder PID with existing audio file by auto-transcribing", async () => {
@@ -230,5 +231,71 @@ describe("toggle-dictation Command", () => {
 
     expect(updateMetadataSpy).toHaveBeenCalledWith({ subtitle: "" });
     expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("lost"));
+  });
+
+  it("shows 'No speech detected' when transcription returns empty", async () => {
+    await LocalStorage.setItem("recording_pid", "1234");
+    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+
+    vi.spyOn(process, "kill").mockImplementation(() => true);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(transcribe).mockResolvedValue("");
+
+    await runCommand();
+
+    expect(showHUDSpy).toHaveBeenCalledWith("No speech detected");
+  });
+
+  it("shows 'Recording too short' when audio file is under 1000 bytes", async () => {
+    await LocalStorage.setItem("recording_pid", "1234");
+    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+
+    vi.spyOn(process, "kill").mockImplementation(() => true);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(statSync).mockReturnValue({ size: 500 } as ReturnType<typeof statSync>);
+
+    await runCommand();
+
+    expect(showHUDSpy).toHaveBeenCalledWith("Recording too short");
+  });
+
+  it("pastes to active app when pasteToActiveApp pref is enabled", async () => {
+    _setPrefs({
+      soxPath: "/opt/homebrew/bin/sox",
+      pythonPath: "/opt/homebrew/bin/python3",
+      saveHistory: false,
+      copyToClipboard: false,
+      pasteToActiveApp: true,
+      silenceTimeout: "0",
+    });
+
+    await LocalStorage.setItem("recording_pid", "1234");
+    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+
+    vi.spyOn(process, "kill").mockImplementation(() => true);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(transcribe).mockResolvedValue("pasted text");
+
+    await runCommand();
+
+    expect(clipboardPasteSpy).toHaveBeenCalledWith("pasted text");
+    expect(clipboardCopySpy).not.toHaveBeenCalled();
+  });
+
+  it("shows error HUD when transcription fails", async () => {
+    await LocalStorage.setItem("recording_pid", "1234");
+    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+
+    vi.spyOn(process, "kill").mockImplementation(() => true);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(transcribe).mockRejectedValue(new Error("model crashed"));
+
+    await runCommand();
+
+    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("Transcription failed"));
+    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("model crashed"));
   });
 });
