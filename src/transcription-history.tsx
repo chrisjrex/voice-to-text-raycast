@@ -16,6 +16,11 @@ function modelDisplayName(value: string): string {
   return MODELS.find((m) => m.value === value)?.title ?? value;
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 export default function TranscriptionHistory() {
   const [entries, setEntries] = useState<HistoryEntry[]>(loadHistory);
 
@@ -61,8 +66,13 @@ export default function TranscriptionHistory() {
                 markdown={entry.text}
                 metadata={
                   <List.Item.Detail.Metadata>
+                    {entry.transcriptionMs != null && (
+                      <List.Item.Detail.Metadata.Label title="Transcription Time" text={formatDuration(entry.transcriptionMs)} />
+                    )}
+                    {entry.postProcessingMs != null && (
+                      <List.Item.Detail.Metadata.Label title="Post-Processing Time" text={formatDuration(entry.postProcessingMs)} />
+                    )}
                     <List.Item.Detail.Metadata.Label title="Transcribed On" text={formatDate(entry.timestamp)} />
-                    <List.Item.Detail.Metadata.Label title="Characters" text={String(entry.text.length)} />
                     {entry.model && (
                       <List.Item.Detail.Metadata.Label title="Model" text={modelDisplayName(entry.model)} />
                     )}

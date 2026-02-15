@@ -154,7 +154,9 @@ async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: str
   const scriptPath = join(environment.supportPath, "transcribe.py");
 
   try {
+    const transcribeStart = Date.now();
     const text = await transcribe(pythonPath, provider, modelId, audioPath, scriptPath);
+    const transcriptionMs = Date.now() - transcribeStart;
 
     if (!text) {
       await updateCommandMetadata({ subtitle: "" });
@@ -165,8 +167,10 @@ async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: str
         await updateCommandMetadata({ subtitle: "Processing..." });
         await showHUD("Processing...");
       }
+      const postProcessStart = Date.now();
       const { text: processed, appliedProcessors } = await runPostProcessing(text);
-      if (saveHistoryEnabled) addHistoryEntry(processed, { model, postProcessors: appliedProcessors });
+      const postProcessingMs = Date.now() - postProcessStart;
+      if (saveHistoryEnabled) addHistoryEntry(processed, { model, postProcessors: appliedProcessors, transcriptionMs, postProcessingMs });
       if (copyToClipboardEnabled) await Clipboard.copy(processed);
       if (pasteToActiveAppEnabled) await Clipboard.paste(processed);
       const preview = processed.length > 60 ? processed.slice(0, 60) + "..." : processed;
