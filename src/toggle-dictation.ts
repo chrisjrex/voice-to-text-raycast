@@ -1,11 +1,11 @@
-import { Clipboard, environment, getPreferenceValues, LocalStorage, showHUD } from "@raycast/api";
+import { Clipboard, environment, getPreferenceValues, LocalStorage, showHUD, updateCommandMetadata } from "@raycast/api";
 import { execFile, spawn } from "child_process";
 import { existsSync, statSync, unlinkSync } from "fs";
 import { join } from "path";
 import { promisify } from "util";
 import { parseModel, transcribe } from "./transcribe";
 import { isModelDownloaded, getActiveModel } from "./models";
-import { runPostProcessing } from "./post-processors";
+import { hasEnabledProcessors, runPostProcessing } from "./post-processors";
 import { addHistoryEntry } from "./history";
 
 const execFileAsync = promisify(execFile);
@@ -115,6 +115,7 @@ async function startRecording(soxPath: string, silenceTimeout: number): Promise<
     }
   }
 
+  await updateCommandMetadata({ subtitle: "Recording..." });
   await showHUD("🎙 Recording...");
 }
 
@@ -134,6 +135,7 @@ async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: str
   await new Promise((r) => setTimeout(r, 300));
 
   if (!existsSync(audioPath)) {
+    await updateCommandMetadata({ subtitle: "" });
     await showHUD("No audio file found");
     return;
   }
@@ -141,10 +143,12 @@ async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: str
   const fileSize = statSync(audioPath).size;
   if (fileSize < 1000) {
     unlinkSync(audioPath);
+    await updateCommandMetadata({ subtitle: "" });
     await showHUD("Recording too short");
     return;
   }
 
+  await updateCommandMetadata({ subtitle: "Transcribing..." });
   await showHUD("Transcribing...");
 
   const scriptPath = join(environment.supportPath, "transcribe.py");
@@ -153,19 +157,26 @@ async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: str
     const text = await transcribe(pythonPath, provider, modelId, audioPath, scriptPath);
 
     if (!text) {
+      await updateCommandMetadata({ subtitle: "" });
       await showHUD("No speech detected");
     } else {
-      await showHUD("Processing...");
+      const willProcess = await hasEnabledProcessors();
+      if (willProcess) {
+        await updateCommandMetadata({ subtitle: "Processing..." });
+        await showHUD("Processing...");
+      }
       const processed = await runPostProcessing(text);
       if (saveHistoryEnabled) addHistoryEntry(processed);
       if (copyToClipboardEnabled) await Clipboard.copy(processed);
       if (pasteToActiveAppEnabled) await Clipboard.paste(processed);
       const preview = processed.length > 60 ? processed.slice(0, 60) + "..." : processed;
+      await updateCommandMetadata({ subtitle: "" });
       await showHUD(`✅ ${preview}`);
     }
   } catch (err: unknown) {
     const stderr = (err as { stderr?: string }).stderr || "";
     const msg = stderr.split("\n").filter(Boolean).pop() || (err instanceof Error ? err.message : String(err));
+    await updateCommandMetadata({ subtitle: "" });
     await showHUD(`Transcription failed: ${msg.slice(0, 80)}`);
   } finally {
     try { unlinkSync(audioPath); } catch {}
@@ -178,6 +189,7 @@ export default async function Command() {
 
   const model = await getActiveModel();
   if (!model) {
+    await updateCommandMetadata({ subtitle: "" });
     await showHUD("No model selected. Use Manage Models to select one.");
     return;
   }
@@ -186,11 +198,13 @@ export default async function Command() {
 
   const depError = await checkDependencies(soxPath, pythonPath, provider);
   if (depError) {
+    await updateCommandMetadata({ subtitle: "" });
     await showHUD(depError);
     return;
   }
 
   if (!isModelDownloaded(modelId)) {
+    await updateCommandMetadata({ subtitle: "" });
     await showHUD("Model not downloaded. Use Manage Models to download it first.");
     return;
   }
@@ -210,6 +224,7 @@ export default async function Command() {
         await LocalStorage.removeItem(STORAGE_KEY_PID);
         await LocalStorage.removeItem(STORAGE_KEY_AUDIO);
         await LocalStorage.removeItem(STORAGE_KEY_MONITOR_PID);
+        await updateCommandMetadata({ subtitle: "" });
         await showHUD("Previous recording lost. Try again.");
       }
       return;

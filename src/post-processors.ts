@@ -70,6 +70,11 @@ export async function saveProcessors(processors: PostProcessor[]): Promise<void>
   await LocalStorage.setItem(STORAGE_KEY, JSON.stringify(processors));
 }
 
+export async function hasEnabledProcessors(): Promise<boolean> {
+  const processors = await loadProcessors();
+  return processors.some((p) => p.enabled);
+}
+
 export async function runPostProcessing(text: string): Promise<string> {
   const processors = await loadProcessors();
   const enabled = processors.filter((p) => p.enabled);
