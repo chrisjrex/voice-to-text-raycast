@@ -15,6 +15,8 @@ export async function loadDictionary(): Promise<DictionaryEntry[]> {
   return [];
 }
 
-export async function saveDictionary(entries: DictionaryEntry[]): Promise<void> {
+export async function saveDictionary(
+  entries: DictionaryEntry[],
+): Promise<void> {
   await LocalStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
 }

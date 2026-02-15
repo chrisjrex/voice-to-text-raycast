@@ -1,4 +1,13 @@
-import { Action, ActionPanel, Alert, Color, confirmAlert, Icon, List, showHUD } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Alert,
+  Color,
+  confirmAlert,
+  Icon,
+  List,
+  showHUD,
+} from "@raycast/api";
 import { useState } from "react";
 import { HistoryEntry, loadHistory, saveHistory } from "./history";
 import { MODELS } from "./models";
@@ -29,7 +38,10 @@ export default function TranscriptionHistory() {
       await confirmAlert({
         title: "Delete Transcription",
         message: "Are you sure you want to delete this transcription?",
-        primaryAction: { title: "Delete", style: Alert.ActionStyle.Destructive },
+        primaryAction: {
+          title: "Delete",
+          style: Alert.ActionStyle.Destructive,
+        },
       })
     ) {
       const updated = entries.filter((e) => e.id !== id);
@@ -43,7 +55,10 @@ export default function TranscriptionHistory() {
       await confirmAlert({
         title: "Delete All History",
         message: "Are you sure you want to delete all transcription history?",
-        primaryAction: { title: "Delete All", style: Alert.ActionStyle.Destructive },
+        primaryAction: {
+          title: "Delete All",
+          style: Alert.ActionStyle.Destructive,
+        },
       })
     ) {
       saveHistory([]);
@@ -54,38 +69,57 @@ export default function TranscriptionHistory() {
   return (
     <List isShowingDetail searchBarPlaceholder="Search transcriptions...">
       {entries.length === 0 ? (
-        <List.EmptyView title="No Transcriptions" description="Transcriptions will appear here after you dictate." />
+        <List.EmptyView
+          title="No Transcriptions"
+          description="Transcriptions will appear here after you dictate."
+        />
       ) : (
         entries.map((entry) => (
           <List.Item
             key={entry.id}
             title={truncate(entry.text, 60)}
-
             detail={
               <List.Item.Detail
                 markdown={entry.text}
                 metadata={
                   <List.Item.Detail.Metadata>
                     {entry.transcriptionMs != null && (
-                      <List.Item.Detail.Metadata.Label title="Transcription Time" text={formatDuration(entry.transcriptionMs)} />
+                      <List.Item.Detail.Metadata.Label
+                        title="Transcription Time"
+                        text={formatDuration(entry.transcriptionMs)}
+                      />
                     )}
                     {entry.postProcessingMs != null && (
-                      <List.Item.Detail.Metadata.Label title="Post-Processing Time" text={formatDuration(entry.postProcessingMs)} />
+                      <List.Item.Detail.Metadata.Label
+                        title="Post-Processing Time"
+                        text={formatDuration(entry.postProcessingMs)}
+                      />
                     )}
-                    <List.Item.Detail.Metadata.Label title="Transcribed On" text={formatDate(entry.timestamp)} />
+                    <List.Item.Detail.Metadata.Label
+                      title="Transcribed On"
+                      text={formatDate(entry.timestamp)}
+                    />
                     {entry.model && (
-                      <List.Item.Detail.Metadata.Label title="Model" text={modelDisplayName(entry.model)} />
+                      <List.Item.Detail.Metadata.Label
+                        title="Model"
+                        text={modelDisplayName(entry.model)}
+                      />
                     )}
-                    {entry.postProcessors && entry.postProcessors.length > 0 && (
-                      <>
-                        <List.Item.Detail.Metadata.Separator />
-                        <List.Item.Detail.Metadata.TagList title="Post-Processing">
-                          {entry.postProcessors.map((name) => (
-                            <List.Item.Detail.Metadata.TagList.Item key={name} text={name} color={Color.Blue} />
-                          ))}
-                        </List.Item.Detail.Metadata.TagList>
-                      </>
-                    )}
+                    {entry.postProcessors &&
+                      entry.postProcessors.length > 0 && (
+                        <>
+                          <List.Item.Detail.Metadata.Separator />
+                          <List.Item.Detail.Metadata.TagList title="Post-Processing">
+                            {entry.postProcessors.map((name) => (
+                              <List.Item.Detail.Metadata.TagList.Item
+                                key={name}
+                                text={name}
+                                color={Color.Blue}
+                              />
+                            ))}
+                          </List.Item.Detail.Metadata.TagList>
+                        </>
+                      )}
                   </List.Item.Detail.Metadata>
                 }
               />
@@ -93,8 +127,15 @@ export default function TranscriptionHistory() {
             actions={
               <ActionPanel>
                 <ActionPanel.Section title="Transcription">
-                  <Action.CopyToClipboard title="Copy Text" content={entry.text} />
-                  <Action.Paste title="Paste Text" content={entry.text} shortcut={{ modifiers: ["cmd"], key: "enter" }} />
+                  <Action.CopyToClipboard
+                    title="Copy Text"
+                    content={entry.text}
+                  />
+                  <Action.Paste
+                    title="Paste Text"
+                    content={entry.text}
+                    shortcut={{ modifiers: ["cmd"], key: "enter" }}
+                  />
                   <Action
                     title="Read Aloud"
                     icon={Icon.SpeakerOn}
@@ -103,10 +144,14 @@ export default function TranscriptionHistory() {
                       try {
                         await showHUD("Speaking...");
                         await speakText(entry.text);
-                        const preview = entry.text.length > 50 ? entry.text.slice(0, 50) + "..." : entry.text;
+                        const preview =
+                          entry.text.length > 50
+                            ? entry.text.slice(0, 50) + "..."
+                            : entry.text;
                         await showHUD(`🔊 ${preview}`);
                       } catch (err: unknown) {
-                        const msg = err instanceof Error ? err.message : String(err);
+                        const msg =
+                          err instanceof Error ? err.message : String(err);
                         await showHUD(`TTS failed: ${msg.slice(0, 80)}`);
                       }
                     }}

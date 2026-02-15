@@ -1,4 +1,12 @@
-import { Action, ActionPanel, Alert, confirmAlert, Icon, List, useNavigation } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Alert,
+  confirmAlert,
+  Icon,
+  List,
+  useNavigation,
+} from "@raycast/api";
 import { Form } from "@raycast/api";
 import { useCallback, useEffect, useState } from "react";
 import { DictionaryEntry, loadDictionary, saveDictionary } from "./dictionary";
@@ -23,7 +31,12 @@ function AddTermForm({ onAdd }: { onAdd: (term: string) => void }) {
         </ActionPanel>
       }
     >
-      <Form.TextField id="term" title="Term" placeholder="e.g. CCY, Séamus" autoFocus />
+      <Form.TextField
+        id="term"
+        title="Term"
+        placeholder="e.g. CCY, Séamus"
+        autoFocus
+      />
     </Form>
   );
 }
@@ -54,8 +67,12 @@ export default function ManageDictionary() {
       if (
         await confirmAlert({
           title: "Delete Term",
-          message: "Are you sure you want to remove this term from the dictionary?",
-          primaryAction: { title: "Delete", style: Alert.ActionStyle.Destructive },
+          message:
+            "Are you sure you want to remove this term from the dictionary?",
+          primaryAction: {
+            title: "Delete",
+            style: Alert.ActionStyle.Destructive,
+          },
         })
       ) {
         const updated = entries.filter((e) => e.id !== id);

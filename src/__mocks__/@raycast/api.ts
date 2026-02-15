@@ -1,11 +1,20 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 const store = new Map<string, string>();
 
 export const LocalStorage = {
-  getItem: async <T = string>(key: string): Promise<T | undefined> => store.get(key) as T | undefined,
-  setItem: async (key: string, value: string): Promise<void> => { store.set(key, value); },
-  removeItem: async (key: string): Promise<void> => { store.delete(key); },
-  clear: async (): Promise<void> => { store.clear(); },
-  allItems: async (): Promise<Record<string, string>> => Object.fromEntries(store),
+  getItem: async <T = string>(key: string): Promise<T | undefined> =>
+    store.get(key) as T | undefined,
+  setItem: async (key: string, value: string): Promise<void> => {
+    store.set(key, value);
+  },
+  removeItem: async (key: string): Promise<void> => {
+    store.delete(key);
+  },
+  clear: async (): Promise<void> => {
+    store.clear();
+  },
+  allItems: async (): Promise<Record<string, string>> =>
+    Object.fromEntries(store),
   _store: store,
 };
 
@@ -21,7 +30,9 @@ export const AI = {
 };
 
 export async function showHUD(_msg: string): Promise<void> {}
-export async function updateCommandMetadata(_meta: Record<string, unknown>): Promise<void> {}
+export async function updateCommandMetadata(
+  _meta: Record<string, unknown>,
+): Promise<void> {}
 let _prefs: Record<string, unknown> = {};
 export function getPreferenceValues<T>(): T {
   return _prefs as T;

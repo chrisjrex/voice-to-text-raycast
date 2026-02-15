@@ -1,10 +1,30 @@
-import { Clipboard, environment, getPreferenceValues, getSelectedText, showHUD, updateCommandMetadata } from "@raycast/api";
+import {
+  Clipboard,
+  environment,
+  getPreferenceValues,
+  getSelectedText,
+  showHUD,
+  updateCommandMetadata,
+} from "@raycast/api";
 import { spawn } from "child_process";
-import { existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from "fs";
+import {
+  existsSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "fs";
 import { createConnection } from "net";
 import { homedir } from "os";
 import { join } from "path";
-import { getActiveTtsVoice, getActiveKokoroVoice, getActiveSystemVoice, isTtsVoiceDownloaded, ttsVoicesDir, ensureDefaultTtsVoice } from "./models";
+import {
+  getActiveTtsVoice,
+  getActiveKokoroVoice,
+  getActiveSystemVoice,
+  isTtsVoiceDownloaded,
+  ttsVoicesDir,
+  ensureDefaultTtsVoice,
+} from "./models";
 
 interface Preferences {
   pythonPath: string;
@@ -98,19 +118,31 @@ function isKokoroServerRunning(): Promise<boolean> {
   if (!existsSync(KOKORO_SOCK)) return Promise.resolve(false);
   return new Promise((resolve) => {
     const conn = createConnection(KOKORO_SOCK);
-    conn.on("connect", () => { conn.destroy(); resolve(true); });
+    conn.on("connect", () => {
+      conn.destroy();
+      resolve(true);
+    });
     conn.on("error", () => resolve(false));
-    setTimeout(() => { conn.destroy(); resolve(false); }, 500);
+    setTimeout(() => {
+      conn.destroy();
+      resolve(false);
+    }, 500);
   });
 }
 
 const KOKORO_LOG = join(environment.supportPath, "kokoro_server.log");
 
-async function startKokoroServer(pythonPath: string, idleTimeout = 120): Promise<void> {
+async function startKokoroServer(
+  pythonPath: string,
+  idleTimeout = 120,
+): Promise<void> {
   writeFileSync(KOKORO_SERVER_SCRIPT, buildKokoroServerScript(idleTimeout));
   writeFileSync(KOKORO_LOG, "");
   const logFd = openSync(KOKORO_LOG, "a");
-  const env = { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}` };
+  const env = {
+    ...process.env,
+    PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}`,
+  };
   const proc = spawn(pythonPath, [KOKORO_SERVER_SCRIPT], {
     detached: true,
     stdio: ["ignore", logFd, logFd],
@@ -130,12 +162,19 @@ async function startKokoroServer(pythonPath: string, idleTimeout = 120): Promise
       }
     }
   }
-  const log = existsSync(KOKORO_LOG) ? readFileSync(KOKORO_LOG, "utf-8").trim() : "";
-  const tail = log ? log.split("\n").slice(-3).join(" ").slice(0, 120) : "no output";
+  const log = existsSync(KOKORO_LOG)
+    ? readFileSync(KOKORO_LOG, "utf-8").trim()
+    : "";
+  const tail = log
+    ? log.split("\n").slice(-3).join(" ").slice(0, 120)
+    : "no output";
   throw new Error(`Server failed to start within 8s: ${tail}`);
 }
 
-async function speakWithKokoroServer(text: string, voice: string): Promise<void> {
+async function speakWithKokoroServer(
+  text: string,
+  voice: string,
+): Promise<void> {
   const outputPath = join(environment.supportPath, `tts-${Date.now()}.wav`);
   const v = voice || "af_heart";
   const request = JSON.stringify({ text, voice: v, output: outputPath }) + "\n";
@@ -146,10 +185,16 @@ async function speakWithKokoroServer(text: string, voice: string): Promise<void>
     conn.on("connect", () => conn.write(request));
     conn.on("data", (chunk: Buffer) => {
       data += chunk.toString();
-      if (data.includes("\n")) { conn.destroy(); resolve(data.trim()); }
+      if (data.includes("\n")) {
+        conn.destroy();
+        resolve(data.trim());
+      }
     });
     conn.on("error", reject);
-    setTimeout(() => { conn.destroy(); reject(new Error("Server response timeout")); }, 120_000);
+    setTimeout(() => {
+      conn.destroy();
+      reject(new Error("Server response timeout"));
+    }, 120_000);
   });
 
   if (!response.startsWith("ok")) {
@@ -164,12 +209,28 @@ function stopKokoroServer(): void {
     const pid = readFileSync(KOKORO_PID, "utf-8").trim();
     process.kill(Number(pid), "SIGTERM");
   } catch {
-    try { unlinkSync(KOKORO_SOCK); } catch {}
-    try { unlinkSync(KOKORO_PID); } catch {}
+    try {
+      unlinkSync(KOKORO_SOCK);
+    } catch {
+      /* ignore */
+    }
+    try {
+      unlinkSync(KOKORO_PID);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
-export { KOKORO_PID, KOKORO_SOCK, isKokoroServerRunning, startKokoroServer, stopKokoroServer, resolveKokoroPython, buildKokoroServerScript };
+export {
+  KOKORO_PID,
+  KOKORO_SOCK,
+  isKokoroServerRunning,
+  startKokoroServer,
+  stopKokoroServer,
+  resolveKokoroPython,
+  buildKokoroServerScript,
+};
 export type { Preferences as ReadAloudPreferences };
 
 export const PLAYBACK_PID = join(environment.supportPath, "tts_playback.pid");
@@ -188,8 +249,14 @@ export function stopCurrentPlayback(): void {
   try {
     const pid = Number(readFileSync(PLAYBACK_PID, "utf-8").trim());
     process.kill(pid, "SIGTERM");
-  } catch {}
-  try { unlinkSync(PLAYBACK_PID); } catch {}
+  } catch {
+    /* ignore */
+  }
+  try {
+    unlinkSync(PLAYBACK_PID);
+  } catch {
+    /* ignore */
+  }
 }
 
 function startPlayback(outputPath: string): void {
@@ -200,13 +267,25 @@ function startPlayback(outputPath: string): void {
   });
   writeFileSync(PLAYBACK_PID, String(player.pid));
   player.on("exit", () => {
-    try { unlinkSync(outputPath); } catch {}
-    try { unlinkSync(PLAYBACK_PID); } catch {}
+    try {
+      unlinkSync(outputPath);
+    } catch {
+      /* ignore */
+    }
+    try {
+      unlinkSync(PLAYBACK_PID);
+    } catch {
+      /* ignore */
+    }
   });
   player.unref();
 }
 
-async function speakWithKokoroColdStart(text: string, pythonPath: string, voice: string): Promise<void> {
+async function speakWithKokoroColdStart(
+  text: string,
+  pythonPath: string,
+  voice: string,
+): Promise<void> {
   const outputPath = join(environment.supportPath, `tts-${Date.now()}.wav`);
   const v = voice || "af_heart";
   const script = `
@@ -219,7 +298,10 @@ sf.write(req["output"], np.concatenate(chunks), 24000)
 `.trim();
 
   const input = JSON.stringify({ text, voice: v, output: outputPath }) + "\n";
-  const env = { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}` };
+  const env = {
+    ...process.env,
+    PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}`,
+  };
 
   await new Promise<void>((resolve, reject) => {
     const proc = spawn(pythonPath, ["-c", script], {
@@ -229,9 +311,12 @@ sf.write(req["output"], np.concatenate(chunks), 24000)
     proc.stdin.write(input);
     proc.stdin.end();
     let stderr = "";
-    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+    proc.stderr.on("data", (d: Buffer) => {
+      stderr += d.toString();
+    });
     proc.on("close", (code) => {
-      if (code !== 0) reject(new Error(stderr || `kokoro exited with code ${code}`));
+      if (code !== 0)
+        reject(new Error(stderr || `kokoro exited with code ${code}`));
       else resolve();
     });
     proc.on("error", reject);
@@ -240,20 +325,31 @@ sf.write(req["output"], np.concatenate(chunks), 24000)
   startPlayback(outputPath);
 }
 
-async function speakWithPiper(text: string, pythonPath: string, voiceId: string): Promise<void> {
+async function speakWithPiper(
+  text: string,
+  pythonPath: string,
+  voiceId: string,
+): Promise<void> {
   const outputPath = join(environment.supportPath, `tts-${Date.now()}.wav`);
   const dataDir = ttsVoicesDir();
 
   await new Promise<void>((resolve, reject) => {
-    const proc = spawn(pythonPath, ["-m", "piper", "-m", voiceId, "--data-dir", dataDir, "-f", outputPath], {
-      stdio: ["pipe", "ignore", "pipe"],
-    });
+    const proc = spawn(
+      pythonPath,
+      ["-m", "piper", "-m", voiceId, "--data-dir", dataDir, "-f", outputPath],
+      {
+        stdio: ["pipe", "ignore", "pipe"],
+      },
+    );
     proc.stdin.write(text);
     proc.stdin.end();
     let stderr = "";
-    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+    proc.stderr.on("data", (d: Buffer) => {
+      stderr += d.toString();
+    });
     proc.on("close", (code) => {
-      if (code !== 0) reject(new Error(stderr || `piper exited with code ${code}`));
+      if (code !== 0)
+        reject(new Error(stderr || `piper exited with code ${code}`));
       else resolve();
     });
     proc.on("error", reject);
@@ -272,7 +368,11 @@ function speakWithSay(text: string, voice: string): void {
     writeFileSync(PLAYBACK_PID, String(child.pid));
   }
   child.on("exit", () => {
-    try { unlinkSync(PLAYBACK_PID); } catch {}
+    try {
+      unlinkSync(PLAYBACK_PID);
+    } catch {
+      /* ignore */
+    }
   });
   child.unref();
 }
@@ -317,7 +417,9 @@ export default async function Command() {
   try {
     const selected = await getSelectedText();
     if (selected?.trim()) selectedText = selected.trim();
-  } catch {}
+  } catch {
+    /* ignore */
+  }
 
   if (playing && !selectedText) {
     stopCurrentPlayback();

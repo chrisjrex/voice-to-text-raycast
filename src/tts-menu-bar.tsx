@@ -1,10 +1,35 @@
-import { Alert, Color, Icon, LocalStorage, MenuBarExtra, confirmAlert, getPreferenceValues, showHUD } from "@raycast/api";
+import {
+  Alert,
+  Color,
+  Icon,
+  LocalStorage,
+  MenuBarExtra,
+  confirmAlert,
+  getPreferenceValues,
+  showHUD,
+} from "@raycast/api";
 import { useEffect, useState } from "react";
 import { existsSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import { isKokoroServerRunning, startKokoroServer, stopKokoroServer, PLAYBACK_PID } from "./read-aloud";
-import { isPythonPackageInstalled, installPiperEngine, uninstallPiperEngine, installKokoroEngine, uninstallKokoroEngine, clearActiveKokoroVoice, clearActiveTtsVoice, getActiveSystemVoice, setActiveSystemVoice, SYSTEM_VOICES } from "./models";
+import {
+  isKokoroServerRunning,
+  startKokoroServer,
+  stopKokoroServer,
+  PLAYBACK_PID,
+} from "./read-aloud";
+import {
+  isPythonPackageInstalled,
+  installPiperEngine,
+  uninstallPiperEngine,
+  installKokoroEngine,
+  uninstallKokoroEngine,
+  clearActiveKokoroVoice,
+  clearActiveTtsVoice,
+  getActiveSystemVoice,
+  setActiveSystemVoice,
+  SYSTEM_VOICES,
+} from "./models";
 
 interface Preferences {
   pythonPath: string;
@@ -22,7 +47,9 @@ function resolveKokoroPython(prefs: Preferences): string {
 export const CACHE_KOKORO = "menubar_kokoro_installed";
 export const CACHE_PIPER = "menubar_piper_installed";
 
-export async function getCachedEngineState(key: string): Promise<boolean | null> {
+export async function getCachedEngineState(
+  key: string,
+): Promise<boolean | null> {
   const cached = await LocalStorage.getItem<boolean>(key);
   return cached !== undefined ? cached : null;
 }
@@ -43,7 +70,9 @@ export default function Command() {
   const kokoroPython = resolveKokoroPython(prefs);
 
   const [serverRunning, setServerRunning] = useState(false);
-  const [serverTransition, setServerTransition] = useState<"starting" | "stopping" | null>(null);
+  const [serverTransition, setServerTransition] = useState<
+    "starting" | "stopping" | null
+  >(null);
   const [kokoroInstalled, setKokoroInstalled] = useState<boolean | null>(null);
   const [piperInstalled, setPiperInstalled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,11 +87,20 @@ export default function Command() {
     });
 
     isKokoroServerRunning().then(setServerRunning);
-    refreshEngineState(CACHE_KOKORO, kokoroPython, "kokoro").then(setKokoroInstalled);
-    refreshEngineState(CACHE_PIPER, pythonPath, "piper").then(setPiperInstalled);
+    refreshEngineState(CACHE_KOKORO, kokoroPython, "kokoro").then(
+      setKokoroInstalled,
+    );
+    refreshEngineState(CACHE_PIPER, pythonPath, "piper").then(
+      setPiperInstalled,
+    );
 
     function isProcessAlive(pid: number): boolean {
-      try { process.kill(pid, 0); return true; } catch { return false; }
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
     }
 
     async function checkActive() {
@@ -70,10 +108,14 @@ export default function Command() {
         try {
           const pid = Number(readFileSync(PLAYBACK_PID, "utf-8").trim());
           return isProcessAlive(pid);
-        } catch { return false; }
+        } catch {
+          return false;
+        }
       })();
       const recordingPid = await LocalStorage.getItem<string>("recording_pid");
-      const recordingActive = recordingPid ? isProcessAlive(Number(recordingPid)) : false;
+      const recordingActive = recordingPid
+        ? isProcessAlive(Number(recordingPid))
+        : false;
       setActive(playbackActive || recordingActive);
     }
     checkActive();
@@ -94,7 +136,10 @@ export default function Command() {
         await showHUD("Kokoro server stopped");
       } else {
         setServerTransition("starting");
-        const idleTimeout = Math.max(0, parseInt(prefs.kokoroIdleTimeout, 10) || 120);
+        const idleTimeout = Math.max(
+          0,
+          parseInt(prefs.kokoroIdleTimeout, 10) || 120,
+        );
         await startKokoroServer(kokoroPython, idleTimeout);
         setServerRunning(true);
         await showHUD("Kokoro server started");
@@ -111,7 +156,8 @@ export default function Command() {
   async function handleInstallKokoro() {
     const confirmed = await confirmAlert({
       title: "Install Kokoro Engine",
-      message: "This will install the Kokoro Python packages (~50MB) and voice engine (~312MB).",
+      message:
+        "This will install the Kokoro Python packages (~50MB) and voice engine (~312MB).",
       primaryAction: { title: "Install" },
     });
     if (!confirmed) return;
@@ -132,8 +178,12 @@ export default function Command() {
   async function handleUninstallKokoro() {
     const confirmed = await confirmAlert({
       title: "Uninstall Kokoro Engine?",
-      message: "This will remove the Kokoro packages, voice engine, and all downloaded voices (~362MB).",
-      primaryAction: { title: "Uninstall", style: Alert.ActionStyle.Destructive },
+      message:
+        "This will remove the Kokoro packages, voice engine, and all downloaded voices (~362MB).",
+      primaryAction: {
+        title: "Uninstall",
+        style: Alert.ActionStyle.Destructive,
+      },
     });
     if (!confirmed) return;
     setBusy(true);
@@ -144,7 +194,7 @@ export default function Command() {
       }
       await uninstallKokoroEngine(kokoroPython);
       await clearActiveKokoroVoice();
-      if (!await getActiveSystemVoice()) {
+      if (!(await getActiveSystemVoice())) {
         await setActiveSystemVoice(SYSTEM_VOICES[0].id);
       }
       setKokoroInstalled(false);
@@ -182,15 +232,19 @@ export default function Command() {
   async function handleUninstallPiper() {
     const confirmed = await confirmAlert({
       title: "Uninstall Piper Engine?",
-      message: "This will remove the Piper voice engine and all downloaded voices.",
-      primaryAction: { title: "Uninstall", style: Alert.ActionStyle.Destructive },
+      message:
+        "This will remove the Piper voice engine and all downloaded voices.",
+      primaryAction: {
+        title: "Uninstall",
+        style: Alert.ActionStyle.Destructive,
+      },
     });
     if (!confirmed) return;
     setBusy(true);
     try {
       await uninstallPiperEngine(pythonPath);
       await clearActiveTtsVoice();
-      if (!await getActiveSystemVoice()) {
+      if (!(await getActiveSystemVoice())) {
         await setActiveSystemVoice(SYSTEM_VOICES[0].id);
       }
       setPiperInstalled(false);
@@ -210,7 +264,17 @@ export default function Command() {
     <MenuBarExtra icon={icon} isLoading={loading}>
       {kokoroInstalled !== false && (
         <MenuBarExtra.Section title="Kokoro Server">
-          <MenuBarExtra.Item title={serverTransition === "starting" ? "Starting…" : serverTransition === "stopping" ? "Stopping…" : serverRunning ? "Running" : "Stopped"} />
+          <MenuBarExtra.Item
+            title={
+              serverTransition === "starting"
+                ? "Starting…"
+                : serverTransition === "stopping"
+                  ? "Stopping…"
+                  : serverRunning
+                    ? "Running"
+                    : "Stopped"
+            }
+          />
           <MenuBarExtra.Item
             title={serverRunning ? "Stop Server" : "Start Server"}
             onAction={handleToggleServer}
@@ -221,7 +285,9 @@ export default function Command() {
       <MenuBarExtra.Section title="TTS Engines">
         <MenuBarExtra.Item
           title={kokoroInstalled ? "Uninstall Kokoro" : "Install Kokoro"}
-          onAction={kokoroInstalled ? handleUninstallKokoro : handleInstallKokoro}
+          onAction={
+            kokoroInstalled ? handleUninstallKokoro : handleInstallKokoro
+          }
         />
         <MenuBarExtra.Item
           title={piperInstalled ? "Uninstall Piper" : "Install Piper"}

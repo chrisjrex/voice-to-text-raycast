@@ -12,7 +12,14 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { useState, useCallback } from "react";
-import { PostProcessor, loadProcessors, saveProcessors, getEffectiveName, getEffectivePrompt, isCustomized } from "./post-processors";
+import {
+  PostProcessor,
+  loadProcessors,
+  saveProcessors,
+  getEffectiveName,
+  getEffectivePrompt,
+  isCustomized,
+} from "./post-processors";
 
 function useProcessors() {
   const [processors, setProcessors] = useState<PostProcessor[]>([]);
@@ -90,7 +97,9 @@ export default function Command() {
   const { push } = useNavigation();
 
   async function toggle(processor: PostProcessor) {
-    const updated = processors.map((p) => (p.id === processor.id ? { ...p, enabled: !p.enabled } : p));
+    const updated = processors.map((p) =>
+      p.id === processor.id ? { ...p, enabled: !p.enabled } : p,
+    );
     await saveProcessors(updated);
     await refresh();
   }
@@ -129,7 +138,10 @@ export default function Command() {
           const updated = [...(await loadProcessors()), newProcessor];
           await saveProcessors(updated);
           await refresh();
-          await showToast({ style: Toast.Style.Success, title: `Created "${name}"` });
+          await showToast({
+            style: Toast.Style.Success,
+            title: `Created "${name}"`,
+          });
         }}
       />,
     );
@@ -153,7 +165,10 @@ export default function Command() {
           });
           await saveProcessors(updated);
           await refresh();
-          await showToast({ style: Toast.Style.Success, title: `Updated "${name}"` });
+          await showToast({
+            style: Toast.Style.Success,
+            title: `Updated "${name}"`,
+          });
         }}
       />,
     );
@@ -161,11 +176,16 @@ export default function Command() {
 
   async function resetProcessor(processor: PostProcessor) {
     const updated = processors.map((p) =>
-      p.id === processor.id ? { ...p, customName: undefined, customPrompt: undefined } : p,
+      p.id === processor.id
+        ? { ...p, customName: undefined, customPrompt: undefined }
+        : p,
     );
     await saveProcessors(updated);
     await refresh();
-    await showToast({ style: Toast.Style.Success, title: `Reset "${processor.name}" to default` });
+    await showToast({
+      style: Toast.Style.Success,
+      title: `Reset "${processor.name}" to default`,
+    });
   }
 
   function getTag(p: PostProcessor): { value: string; color: Color } {
@@ -182,8 +202,14 @@ export default function Command() {
           title={getEffectiveName(p)}
           accessories={[
             p.enabled
-              ? { icon: { source: Icon.CheckCircle, tintColor: Color.Green }, tooltip: "Enabled" }
-              : { icon: { source: Icon.Circle, tintColor: Color.SecondaryText }, tooltip: "Disabled" },
+              ? {
+                  icon: { source: Icon.CheckCircle, tintColor: Color.Green },
+                  tooltip: "Enabled",
+                }
+              : {
+                  icon: { source: Icon.Circle, tintColor: Color.SecondaryText },
+                  tooltip: "Disabled",
+                },
             { tag: getTag(p) },
           ]}
           detail={<List.Item.Detail markdown={getEffectivePrompt(p)} />}
@@ -194,10 +220,24 @@ export default function Command() {
                 icon={p.enabled ? Icon.Circle : Icon.CheckCircle}
                 onAction={() => toggle(p)}
               />
-              <Action title="Create Custom Processor" icon={Icon.Plus} shortcut={{ modifiers: ["cmd"], key: "n" }} onAction={openCreateForm} />
-              <Action title="Edit" icon={Icon.Pencil} shortcut={{ modifiers: ["cmd"], key: "e" }} onAction={() => openEditForm(p)} />
+              <Action
+                title="Create Custom Processor"
+                icon={Icon.Plus}
+                shortcut={{ modifiers: ["cmd"], key: "n" }}
+                onAction={openCreateForm}
+              />
+              <Action
+                title="Edit"
+                icon={Icon.Pencil}
+                shortcut={{ modifiers: ["cmd"], key: "e" }}
+                onAction={() => openEditForm(p)}
+              />
               {isCustomized(p) && (
-                <Action title="Reset to Default" icon={Icon.RotateAntiClockwise} onAction={() => resetProcessor(p)} />
+                <Action
+                  title="Reset to Default"
+                  icon={Icon.RotateAntiClockwise}
+                  onAction={() => resetProcessor(p)}
+                />
               )}
               {!p.builtin && (
                 <Action
@@ -209,10 +249,20 @@ export default function Command() {
                 />
               )}
               {index > 0 && (
-                <Action title="Move Up" icon={Icon.ArrowUp} shortcut={{ modifiers: ["cmd", "shift"], key: "arrowUp" }} onAction={() => move(index, -1)} />
+                <Action
+                  title="Move Up"
+                  icon={Icon.ArrowUp}
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "arrowUp" }}
+                  onAction={() => move(index, -1)}
+                />
               )}
               {index < processors.length - 1 && (
-                <Action title="Move Down" icon={Icon.ArrowDown} shortcut={{ modifiers: ["cmd", "shift"], key: "arrowDown" }} onAction={() => move(index, 1)} />
+                <Action
+                  title="Move Down"
+                  icon={Icon.ArrowDown}
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "arrowDown" }}
+                  onAction={() => move(index, 1)}
+                />
               )}
             </ActionPanel>
           }

@@ -12,7 +12,9 @@ vi.mock("fs", async (importOriginal) => {
       if (!(path in files)) throw new Error("ENOENT");
       return files[path];
     }),
-    writeFileSync: vi.fn((path: string, data: string) => { files[path] = data; }),
+    writeFileSync: vi.fn((path: string, data: string) => {
+      files[path] = data;
+    }),
     mkdirSync: vi.fn(),
   };
 });
@@ -30,7 +32,8 @@ describe("loadHistory", () => {
 
   it("survives corrupted data gracefully", () => {
     // Simulate file with garbage content
-    files[Object.keys(files)[0] || "/tmp/test-support/history.json"] = "not json{{{";
+    files[Object.keys(files)[0] || "/tmp/test-support/history.json"] =
+      "not json{{{";
     // Force the path to exist
     const path = "/tmp/test-support/history.json";
     files[path] = "not json{{{";

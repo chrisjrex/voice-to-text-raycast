@@ -1,4 +1,11 @@
-import { Clipboard, environment, getPreferenceValues, LocalStorage, showHUD, updateCommandMetadata } from "@raycast/api";
+import {
+  Clipboard,
+  environment,
+  getPreferenceValues,
+  LocalStorage,
+  showHUD,
+  updateCommandMetadata,
+} from "@raycast/api";
 import { execFile, spawn } from "child_process";
 import { existsSync, statSync, unlinkSync } from "fs";
 import { join } from "path";
@@ -33,7 +40,11 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-async function checkDependencies(soxPath: string, pythonPath: string, provider: string): Promise<string | null> {
+async function checkDependencies(
+  soxPath: string,
+  pythonPath: string,
+  provider: string,
+): Promise<string | null> {
   const alreadyChecked = await LocalStorage.getItem<string>(DEPS_CHECKED_KEY);
   if (alreadyChecked === provider) return null;
 
@@ -55,13 +66,23 @@ async function checkDependencies(soxPath: string, pythonPath: string, provider: 
   return null;
 }
 
-async function startRecording(soxPath: string, silenceTimeout: number): Promise<void> {
-  const audioPath = join(environment.supportPath, `recording-${Date.now()}.wav`);
+async function startRecording(
+  soxPath: string,
+  silenceTimeout: number,
+): Promise<void> {
+  const audioPath = join(
+    environment.supportPath,
+    `recording-${Date.now()}.wav`,
+  );
 
-  const recorder = spawn(soxPath, ["-d", "-t", "wav", "-r", "16000", "-c", "1", "-b", "16", audioPath], {
-    detached: true,
-    stdio: "ignore",
-  });
+  const recorder = spawn(
+    soxPath,
+    ["-d", "-t", "wav", "-r", "16000", "-c", "1", "-b", "16", audioPath],
+    {
+      detached: true,
+      stdio: "ignore",
+    },
+  );
   recorder.unref();
 
   if (!recorder.pid) {
@@ -111,7 +132,10 @@ async function startRecording(soxPath: string, silenceTimeout: number): Promise<
     monitor.unref();
 
     if (monitor.pid) {
-      await LocalStorage.setItem(STORAGE_KEY_MONITOR_PID, monitor.pid.toString());
+      await LocalStorage.setItem(
+        STORAGE_KEY_MONITOR_PID,
+        monitor.pid.toString(),
+      );
     }
   }
 
@@ -119,12 +143,32 @@ async function startRecording(soxPath: string, silenceTimeout: number): Promise<
   await showHUD("🎙 Recording...");
 }
 
-async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: string, provider: string, modelId: string, model: string, saveHistoryEnabled: boolean, copyToClipboardEnabled: boolean, pasteToActiveAppEnabled: boolean): Promise<void> {
-  try { process.kill(pid, "SIGTERM"); } catch {}
+async function stopAndTranscribe(
+  pid: number,
+  audioPath: string,
+  pythonPath: string,
+  provider: string,
+  modelId: string,
+  model: string,
+  saveHistoryEnabled: boolean,
+  copyToClipboardEnabled: boolean,
+  pasteToActiveAppEnabled: boolean,
+): Promise<void> {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    /* ignore */
+  }
 
-  const monitorPid = await LocalStorage.getItem<string>(STORAGE_KEY_MONITOR_PID);
+  const monitorPid = await LocalStorage.getItem<string>(
+    STORAGE_KEY_MONITOR_PID,
+  );
   if (monitorPid) {
-    try { process.kill(parseInt(monitorPid, 10), "SIGTERM"); } catch {}
+    try {
+      process.kill(parseInt(monitorPid, 10), "SIGTERM");
+    } catch {
+      /* ignore */
+    }
   }
 
   await LocalStorage.removeItem(STORAGE_KEY_PID);
@@ -155,7 +199,13 @@ async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: str
 
   try {
     const transcribeStart = Date.now();
-    const text = await transcribe(pythonPath, provider, modelId, audioPath, scriptPath);
+    const text = await transcribe(
+      pythonPath,
+      provider,
+      modelId,
+      audioPath,
+      scriptPath,
+    );
     const transcriptionMs = Date.now() - transcribeStart;
 
     if (!text) {
@@ -168,27 +218,48 @@ async function stopAndTranscribe(pid: number, audioPath: string, pythonPath: str
         await showHUD("Processing...");
       }
       const postProcessStart = Date.now();
-      const { text: processed, appliedProcessors } = await runPostProcessing(text);
+      const { text: processed, appliedProcessors } =
+        await runPostProcessing(text);
       const postProcessingMs = Date.now() - postProcessStart;
-      if (saveHistoryEnabled) addHistoryEntry(processed, { model, postProcessors: appliedProcessors, transcriptionMs, postProcessingMs });
+      if (saveHistoryEnabled)
+        addHistoryEntry(processed, {
+          model,
+          postProcessors: appliedProcessors,
+          transcriptionMs,
+          postProcessingMs,
+        });
       if (copyToClipboardEnabled) await Clipboard.copy(processed);
       if (pasteToActiveAppEnabled) await Clipboard.paste(processed);
-      const preview = processed.length > 60 ? processed.slice(0, 60) + "..." : processed;
+      const preview =
+        processed.length > 60 ? processed.slice(0, 60) + "..." : processed;
       await updateCommandMetadata({ subtitle: "" });
       await showHUD(`✅ ${preview}`);
     }
   } catch (err: unknown) {
     const stderr = (err as { stderr?: string }).stderr || "";
-    const msg = stderr.split("\n").filter(Boolean).pop() || (err instanceof Error ? err.message : String(err));
+    const msg =
+      stderr.split("\n").filter(Boolean).pop() ||
+      (err instanceof Error ? err.message : String(err));
     await updateCommandMetadata({ subtitle: "" });
     await showHUD(`Transcription failed: ${msg.slice(0, 80)}`);
   } finally {
-    try { unlinkSync(audioPath); } catch {}
+    try {
+      unlinkSync(audioPath);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 export default async function Command() {
-  const { soxPath, pythonPath, saveHistory: saveHistoryEnabled, copyToClipboard: copyToClipboardEnabled, pasteToActiveApp: pasteToActiveAppEnabled, silenceTimeout: silenceTimeoutStr } = getPreferenceValues<Preferences>();
+  const {
+    soxPath,
+    pythonPath,
+    saveHistory: saveHistoryEnabled,
+    copyToClipboard: copyToClipboardEnabled,
+    pasteToActiveApp: pasteToActiveAppEnabled,
+    silenceTimeout: silenceTimeoutStr,
+  } = getPreferenceValues<Preferences>();
   const silenceTimeout = Math.max(0, parseFloat(silenceTimeoutStr) || 0);
 
   const model = await getActiveModel();
@@ -209,7 +280,9 @@ export default async function Command() {
 
   if (!isModelDownloaded(modelId)) {
     await updateCommandMetadata({ subtitle: "" });
-    await showHUD("Model not downloaded. Use Manage Models to download it first.");
+    await showHUD(
+      "Model not downloaded. Use Manage Models to download it first.",
+    );
     return;
   }
 
@@ -223,7 +296,17 @@ export default async function Command() {
       if (existsSync(storedAudio) && statSync(storedAudio).size >= 1000) {
         await LocalStorage.removeItem(STORAGE_KEY_PID);
         await LocalStorage.removeItem(STORAGE_KEY_AUDIO);
-        await stopAndTranscribe(pid, storedAudio, pythonPath, provider, modelId, model, saveHistoryEnabled, copyToClipboardEnabled, pasteToActiveAppEnabled);
+        await stopAndTranscribe(
+          pid,
+          storedAudio,
+          pythonPath,
+          provider,
+          modelId,
+          model,
+          saveHistoryEnabled,
+          copyToClipboardEnabled,
+          pasteToActiveAppEnabled,
+        );
       } else {
         await LocalStorage.removeItem(STORAGE_KEY_PID);
         await LocalStorage.removeItem(STORAGE_KEY_AUDIO);
@@ -234,7 +317,17 @@ export default async function Command() {
       return;
     }
 
-    await stopAndTranscribe(pid, storedAudio, pythonPath, provider, modelId, model, saveHistoryEnabled, copyToClipboardEnabled, pasteToActiveAppEnabled);
+    await stopAndTranscribe(
+      pid,
+      storedAudio,
+      pythonPath,
+      provider,
+      modelId,
+      model,
+      saveHistoryEnabled,
+      copyToClipboardEnabled,
+      pasteToActiveAppEnabled,
+    );
   } else {
     await startRecording(soxPath, silenceTimeout);
   }

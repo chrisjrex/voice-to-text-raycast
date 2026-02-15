@@ -16,19 +16,41 @@ describe("loadProcessors", () => {
   });
 
   it("merges new builtins without overwriting user customizations", async () => {
-    const partial = [{ id: "builtin-fix-grammar", name: "Fix Grammar", prompt: "fix it", enabled: true, builtin: true }];
+    const partial = [
+      {
+        id: "builtin-fix-grammar",
+        name: "Fix Grammar",
+        prompt: "fix it",
+        enabled: true,
+        builtin: true,
+      },
+    ];
     await LocalStorage.setItem("post_processors", JSON.stringify(partial));
 
     const processors = await loadProcessors();
     expect(processors.length).toBeGreaterThan(1);
     // User's enabled=true choice is preserved, not reset to builtin default
-    expect(processors.find((p) => p.id === "builtin-fix-grammar")?.enabled).toBe(true);
+    expect(
+      processors.find((p) => p.id === "builtin-fix-grammar")?.enabled,
+    ).toBe(true);
   });
 
   it("preserves user-created custom processors", async () => {
     const custom = [
-      { id: "builtin-fix-grammar", name: "Fix Grammar", prompt: "fix", enabled: false, builtin: true },
-      { id: "custom-1", name: "My Custom", prompt: "do stuff", enabled: true, builtin: false },
+      {
+        id: "builtin-fix-grammar",
+        name: "Fix Grammar",
+        prompt: "fix",
+        enabled: false,
+        builtin: true,
+      },
+      {
+        id: "custom-1",
+        name: "My Custom",
+        prompt: "do stuff",
+        enabled: true,
+        builtin: false,
+      },
     ];
     await LocalStorage.setItem("post_processors", JSON.stringify(custom));
 
@@ -48,7 +70,13 @@ describe("runPostProcessing", () => {
 
   it("sends enabled processor instructions to AI", async () => {
     const processors = [
-      { id: "p1", name: "Fix Grammar", prompt: "Correct grammar", enabled: true, builtin: true },
+      {
+        id: "p1",
+        name: "Fix Grammar",
+        prompt: "Correct grammar",
+        enabled: true,
+        builtin: true,
+      },
     ];
     await LocalStorage.setItem("post_processors", JSON.stringify(processors));
 
@@ -63,9 +91,27 @@ describe("runPostProcessing", () => {
 
   it("includes all enabled processors in a single prompt", async () => {
     const processors = [
-      { id: "p1", name: "Grammar", prompt: "Correct grammar", enabled: true, builtin: true },
-      { id: "p2", name: "Filler", prompt: "Remove filler words", enabled: true, builtin: true },
-      { id: "p3", name: "Disabled", prompt: "Should not appear", enabled: false, builtin: true },
+      {
+        id: "p1",
+        name: "Grammar",
+        prompt: "Correct grammar",
+        enabled: true,
+        builtin: true,
+      },
+      {
+        id: "p2",
+        name: "Filler",
+        prompt: "Remove filler words",
+        enabled: true,
+        builtin: true,
+      },
+      {
+        id: "p3",
+        name: "Disabled",
+        prompt: "Should not appear",
+        enabled: false,
+        builtin: true,
+      },
     ];
     await LocalStorage.setItem("post_processors", JSON.stringify(processors));
 
@@ -83,10 +129,13 @@ describe("runPostProcessing", () => {
       { id: "p1", name: "Fix", prompt: "Fix it", enabled: true, builtin: true },
     ];
     await LocalStorage.setItem("post_processors", JSON.stringify(processors));
-    await LocalStorage.setItem("dictionary", JSON.stringify([
-      { id: "1", term: "GraphQL" },
-      { id: "2", term: "OAuth" },
-    ]));
+    await LocalStorage.setItem(
+      "dictionary",
+      JSON.stringify([
+        { id: "1", term: "GraphQL" },
+        { id: "2", term: "OAuth" },
+      ]),
+    );
 
     const askSpy = vi.spyOn(AI, "ask");
     await runPostProcessing("test");

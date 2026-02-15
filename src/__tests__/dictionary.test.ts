@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 
 import { loadDictionary, saveDictionary } from "../dictionary";
 import { LocalStorage } from "@raycast/api";
@@ -13,7 +13,10 @@ describe("loadDictionary", () => {
   });
 
   it("parses stored entries", async () => {
-    const entries = [{ id: "1", term: "API" }, { id: "2", term: "OAuth" }];
+    const entries = [
+      { id: "1", term: "API" },
+      { id: "2", term: "OAuth" },
+    ];
     await LocalStorage.setItem("dictionary", JSON.stringify(entries));
     expect(await loadDictionary()).toEqual(entries);
   });

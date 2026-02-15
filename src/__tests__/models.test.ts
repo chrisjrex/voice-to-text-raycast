@@ -29,7 +29,12 @@ import { LocalStorage } from "@raycast/api";
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
-  return { ...actual, existsSync: vi.fn(), readdirSync: vi.fn(), rmSync: vi.fn() };
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    readdirSync: vi.fn(),
+    rmSync: vi.fn(),
+  };
 });
 vi.mock("child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("child_process")>();
@@ -41,11 +46,15 @@ const mockReaddirSync = vi.mocked(readdirSync);
 
 describe("modelIdFromValue", () => {
   it("extracts model ID after first colon", () => {
-    expect(modelIdFromValue("whisper:mlx-community/whisper-tiny")).toBe("mlx-community/whisper-tiny");
+    expect(modelIdFromValue("whisper:mlx-community/whisper-tiny")).toBe(
+      "mlx-community/whisper-tiny",
+    );
   });
 
   it("handles multiple colons", () => {
-    expect(modelIdFromValue("whisper:org/model:variant")).toBe("org/model:variant");
+    expect(modelIdFromValue("whisper:org/model:variant")).toBe(
+      "org/model:variant",
+    );
   });
 });
 
@@ -55,7 +64,9 @@ describe("isModelDownloaded", () => {
   });
 
   it("returns true when snapshots directory has entries", () => {
-    mockReaddirSync.mockReturnValue(["abc123" as unknown as import("fs").Dirent]);
+    mockReaddirSync.mockReturnValue([
+      "abc123" as unknown as import("fs").Dirent,
+    ]);
     expect(isModelDownloaded("mlx-community/whisper-tiny")).toBe(true);
   });
 
@@ -65,7 +76,9 @@ describe("isModelDownloaded", () => {
   });
 
   it("returns false when snapshots directory does not exist", () => {
-    mockReaddirSync.mockImplementation(() => { throw new Error("ENOENT"); });
+    mockReaddirSync.mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
     expect(isModelDownloaded("mlx-community/whisper-tiny")).toBe(false);
   });
 });
@@ -92,18 +105,24 @@ describe("isKokoroModelDownloaded", () => {
   });
 
   it("returns true when kokoro-v1_0.pth exists in snapshot", () => {
-    mockReaddirSync.mockReturnValue(["snapshot1" as unknown as import("fs").Dirent]);
+    mockReaddirSync.mockReturnValue([
+      "snapshot1" as unknown as import("fs").Dirent,
+    ]);
     mockExistsSync.mockReturnValue(true);
     expect(isKokoroModelDownloaded()).toBe(true);
   });
 
   it("returns false when no snapshot directory exists", () => {
-    mockReaddirSync.mockImplementation(() => { throw new Error("ENOENT"); });
+    mockReaddirSync.mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
     expect(isKokoroModelDownloaded()).toBe(false);
   });
 
   it("returns false when model file is missing from snapshot", () => {
-    mockReaddirSync.mockReturnValue(["snapshot1" as unknown as import("fs").Dirent]);
+    mockReaddirSync.mockReturnValue([
+      "snapshot1" as unknown as import("fs").Dirent,
+    ]);
     mockExistsSync.mockReturnValue(false);
     expect(isKokoroModelDownloaded()).toBe(false);
   });
@@ -115,18 +134,24 @@ describe("isKokoroVoiceDownloaded", () => {
   });
 
   it("returns true when voice .pt file exists in snapshot", () => {
-    mockReaddirSync.mockReturnValue(["snapshot1" as unknown as import("fs").Dirent]);
+    mockReaddirSync.mockReturnValue([
+      "snapshot1" as unknown as import("fs").Dirent,
+    ]);
     mockExistsSync.mockReturnValue(true);
     expect(isKokoroVoiceDownloaded("af_heart")).toBe(true);
   });
 
   it("returns false when no snapshot exists", () => {
-    mockReaddirSync.mockImplementation(() => { throw new Error("ENOENT"); });
+    mockReaddirSync.mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
     expect(isKokoroVoiceDownloaded("af_heart")).toBe(false);
   });
 
   it("returns false when voice file is missing", () => {
-    mockReaddirSync.mockReturnValue(["snapshot1" as unknown as import("fs").Dirent]);
+    mockReaddirSync.mockReturnValue([
+      "snapshot1" as unknown as import("fs").Dirent,
+    ]);
     mockExistsSync.mockReturnValue(false);
     expect(isKokoroVoiceDownloaded("af_heart")).toBe(false);
   });
@@ -224,13 +249,16 @@ function mockExecFileSuccess() {
 
 function mockExecFileFailure(msg: string) {
   vi.mocked(execFile).mockImplementation((_cmd, _args, _opts, cb) => {
-    if (typeof cb === "function") (cb as (err: Error | null) => void)(new Error(msg));
+    if (typeof cb === "function")
+      (cb as (err: Error | null) => void)(new Error(msg));
     return {} as ReturnType<typeof execFile>;
   });
 }
 
 describe("installPiperEngine", () => {
-  beforeEach(() => { vi.resetAllMocks(); });
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
 
   it("calls pip install piper-tts", async () => {
     mockExecFileSuccess();
@@ -245,17 +273,24 @@ describe("installPiperEngine", () => {
 
   it("rejects on failure", async () => {
     mockExecFileFailure("pip error");
-    await expect(installPiperEngine("/usr/bin/python3")).rejects.toThrow("pip error");
+    await expect(installPiperEngine("/usr/bin/python3")).rejects.toThrow(
+      "pip error",
+    );
   });
 });
 
 describe("uninstallPiperEngine", () => {
-  beforeEach(() => { vi.resetAllMocks(); });
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
 
   it("removes voice directory and calls pip uninstall", async () => {
     mockExecFileSuccess();
     await uninstallPiperEngine("/usr/bin/python3");
-    expect(rmSync).toHaveBeenCalledWith(expect.stringContaining("tts-voices"), { recursive: true, force: true });
+    expect(rmSync).toHaveBeenCalledWith(expect.stringContaining("tts-voices"), {
+      recursive: true,
+      force: true,
+    });
     expect(execFile).toHaveBeenCalledWith(
       "/usr/bin/python3",
       ["-m", "pip", "uninstall", "--break-system-packages", "-y", "piper-tts"],
@@ -266,7 +301,9 @@ describe("uninstallPiperEngine", () => {
 });
 
 describe("installKokoroEngine", () => {
-  beforeEach(() => { vi.resetAllMocks(); });
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
 
   it("creates venv when kokoroPython does not exist, then pip installs", async () => {
     mockExistsSync.mockReturnValue(false);
@@ -299,7 +336,9 @@ describe("installKokoroEngine", () => {
 });
 
 describe("uninstallKokoroEngine", () => {
-  beforeEach(() => { vi.resetAllMocks(); });
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
 
   it("removes model cache and pip uninstalls when python exists", async () => {
     mockExistsSync.mockReturnValue(true);
@@ -307,7 +346,10 @@ describe("uninstallKokoroEngine", () => {
 
     await uninstallKokoroEngine("/tmp/venv/bin/python3");
 
-    expect(rmSync).toHaveBeenCalledWith(expect.stringContaining("models--hexgrad--Kokoro-82M"), { recursive: true, force: true });
+    expect(rmSync).toHaveBeenCalledWith(
+      expect.stringContaining("models--hexgrad--Kokoro-82M"),
+      { recursive: true, force: true },
+    );
     expect(execFile).toHaveBeenCalledWith(
       "/tmp/venv/bin/python3",
       ["-m", "pip", "uninstall", "-y", "kokoro", "soundfile", "numpy"],

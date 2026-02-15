@@ -19,7 +19,9 @@ vi.mock("../transcribe", () => ({
 }));
 vi.mock("../post-processors", () => ({
   hasEnabledProcessors: vi.fn(async () => false),
-  runPostProcessing: vi.fn((text: string) => Promise.resolve({ text, appliedProcessors: [] })),
+  runPostProcessing: vi.fn((text: string) =>
+    Promise.resolve({ text, appliedProcessors: [] }),
+  ),
 }));
 vi.mock("../history", () => ({
   addHistoryEntry: vi.fn(),
@@ -52,11 +54,16 @@ _setPrefs({
   silenceTimeout: "0",
 });
 
-vi.mocked(parseModel).mockReturnValue({ provider: "whisper", modelId: "mlx-community/whisper-tiny" });
+vi.mocked(parseModel).mockReturnValue({
+  provider: "whisper",
+  modelId: "mlx-community/whisper-tiny",
+});
 
 function mockExecFileSuccess() {
   vi.mocked(execFile).mockImplementation((_cmd, _args, cb: unknown) => {
-    (cb as (err: null, result: { stdout: string }) => void)(null, { stdout: "sox v14.4.2" });
+    (cb as (err: null, result: { stdout: string }) => void)(null, {
+      stdout: "sox v14.4.2",
+    });
     return {} as ReturnType<typeof execFile>;
   });
 }
@@ -81,10 +88,18 @@ describe("toggle-dictation Command", () => {
       silenceTimeout: "0",
     });
 
-    vi.mocked(getActiveModel).mockResolvedValue("whisper:mlx-community/whisper-tiny");
-    vi.mocked(parseModel).mockReturnValue({ provider: "whisper", modelId: "mlx-community/whisper-tiny" });
+    vi.mocked(getActiveModel).mockResolvedValue(
+      "whisper:mlx-community/whisper-tiny",
+    );
+    vi.mocked(parseModel).mockReturnValue({
+      provider: "whisper",
+      modelId: "mlx-community/whisper-tiny",
+    });
     vi.mocked(isModelDownloaded).mockReturnValue(true);
-    vi.mocked(runPostProcessing).mockImplementation(async (text: string) => ({ text, appliedProcessors: [] }));
+    vi.mocked(runPostProcessing).mockImplementation(async (text: string) => ({
+      text,
+      appliedProcessors: [],
+    }));
     mockExecFileSuccess();
   });
 
@@ -103,29 +118,44 @@ describe("toggle-dictation Command", () => {
       expect.arrayContaining(["-d", "-t", "wav"]),
       expect.objectContaining({ detached: true }),
     );
-    expect(updateMetadataSpy).toHaveBeenCalledWith({ subtitle: "Recording..." });
-    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("Recording"));
+    expect(updateMetadataSpy).toHaveBeenCalledWith({
+      subtitle: "Recording...",
+    });
+    expect(showHUDSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Recording"),
+    );
   });
 
   it("stops and transcribes when PID is stored and process is alive", async () => {
     await LocalStorage.setItem("recording_pid", "1234");
-    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+    await LocalStorage.setItem(
+      "audio_path",
+      "/tmp/test-support/recording-123.wav",
+    );
 
     vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
       if (signal === 0) return true;
       return true;
     });
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<
+      typeof statSync
+    >);
     vi.mocked(transcribe).mockResolvedValue("hello world");
 
     await runCommand();
 
     expect(transcribe).toHaveBeenCalled();
-    expect(updateMetadataSpy).toHaveBeenCalledWith({ subtitle: "Transcribing..." });
-    expect(updateMetadataSpy).not.toHaveBeenCalledWith({ subtitle: "Processing..." });
+    expect(updateMetadataSpy).toHaveBeenCalledWith({
+      subtitle: "Transcribing...",
+    });
+    expect(updateMetadataSpy).not.toHaveBeenCalledWith({
+      subtitle: "Processing...",
+    });
     expect(updateMetadataSpy).toHaveBeenCalledWith({ subtitle: "" });
-    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("hello world"));
+    expect(showHUDSpy).toHaveBeenCalledWith(
+      expect.stringContaining("hello world"),
+    );
   });
 
   it("shows error HUD when no model is selected", async () => {
@@ -134,7 +164,9 @@ describe("toggle-dictation Command", () => {
     await runCommand();
 
     expect(updateMetadataSpy).toHaveBeenCalledWith({ subtitle: "" });
-    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("No model selected"));
+    expect(showHUDSpy).toHaveBeenCalledWith(
+      expect.stringContaining("No model selected"),
+    );
   });
 
   it("shows error HUD when model is not downloaded", async () => {
@@ -143,7 +175,9 @@ describe("toggle-dictation Command", () => {
     await runCommand();
 
     expect(updateMetadataSpy).toHaveBeenCalledWith({ subtitle: "" });
-    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("not downloaded"));
+    expect(showHUDSpy).toHaveBeenCalledWith(
+      expect.stringContaining("not downloaded"),
+    );
   });
 
   it("shows error HUD when sox dependency check fails", async () => {
@@ -156,24 +190,36 @@ describe("toggle-dictation Command", () => {
     await runCommand();
 
     expect(updateMetadataSpy).toHaveBeenCalledWith({ subtitle: "" });
-    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("sox not found"));
+    expect(showHUDSpy).toHaveBeenCalledWith(
+      expect.stringContaining("sox not found"),
+    );
   });
 
   it("post-processes transcription result before clipboard", async () => {
     await LocalStorage.setItem("recording_pid", "1234");
-    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+    await LocalStorage.setItem(
+      "audio_path",
+      "/tmp/test-support/recording-123.wav",
+    );
 
     vi.spyOn(process, "kill").mockImplementation(() => true);
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<
+      typeof statSync
+    >);
     vi.mocked(transcribe).mockResolvedValue("raw text");
     vi.mocked(hasEnabledProcessors).mockResolvedValue(true);
-    vi.mocked(runPostProcessing).mockResolvedValue({ text: "processed text", appliedProcessors: ["Fix Grammar"] });
+    vi.mocked(runPostProcessing).mockResolvedValue({
+      text: "processed text",
+      appliedProcessors: ["Fix Grammar"],
+    });
 
     await runCommand();
 
     expect(runPostProcessing).toHaveBeenCalledWith("raw text");
-    expect(updateMetadataSpy).toHaveBeenCalledWith({ subtitle: "Processing..." });
+    expect(updateMetadataSpy).toHaveBeenCalledWith({
+      subtitle: "Processing...",
+    });
     expect(clipboardCopySpy).toHaveBeenCalledWith("processed text");
   });
 
@@ -188,28 +234,44 @@ describe("toggle-dictation Command", () => {
     });
 
     await LocalStorage.setItem("recording_pid", "1234");
-    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+    await LocalStorage.setItem(
+      "audio_path",
+      "/tmp/test-support/recording-123.wav",
+    );
 
     vi.spyOn(process, "kill").mockImplementation(() => true);
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<
+      typeof statSync
+    >);
     vi.mocked(transcribe).mockResolvedValue("saved text");
 
     await runCommand();
 
-    expect(addHistoryEntry).toHaveBeenCalledWith("saved text", expect.objectContaining({ model: "whisper:mlx-community/whisper-tiny", postProcessors: [] }));
+    expect(addHistoryEntry).toHaveBeenCalledWith(
+      "saved text",
+      expect.objectContaining({
+        model: "whisper:mlx-community/whisper-tiny",
+        postProcessors: [],
+      }),
+    );
   });
 
   it("handles dead recorder PID with existing audio file by auto-transcribing", async () => {
     await LocalStorage.setItem("recording_pid", "1234");
-    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+    await LocalStorage.setItem(
+      "audio_path",
+      "/tmp/test-support/recording-123.wav",
+    );
 
     vi.spyOn(process, "kill").mockImplementation((_pid, signal) => {
       if (signal === 0) throw new Error("ESRCH");
       return true;
     });
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<
+      typeof statSync
+    >);
     vi.mocked(transcribe).mockResolvedValue("recovered text");
 
     await runCommand();
@@ -219,7 +281,10 @@ describe("toggle-dictation Command", () => {
 
   it("handles dead recorder PID with missing audio file by showing error", async () => {
     await LocalStorage.setItem("recording_pid", "1234");
-    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+    await LocalStorage.setItem(
+      "audio_path",
+      "/tmp/test-support/recording-123.wav",
+    );
 
     vi.spyOn(process, "kill").mockImplementation((_pid, signal) => {
       if (signal === 0) throw new Error("ESRCH");
@@ -235,11 +300,16 @@ describe("toggle-dictation Command", () => {
 
   it("shows 'No speech detected' when transcription returns empty", async () => {
     await LocalStorage.setItem("recording_pid", "1234");
-    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+    await LocalStorage.setItem(
+      "audio_path",
+      "/tmp/test-support/recording-123.wav",
+    );
 
     vi.spyOn(process, "kill").mockImplementation(() => true);
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<
+      typeof statSync
+    >);
     vi.mocked(transcribe).mockResolvedValue("");
 
     await runCommand();
@@ -249,11 +319,16 @@ describe("toggle-dictation Command", () => {
 
   it("shows 'Recording too short' when audio file is under 1000 bytes", async () => {
     await LocalStorage.setItem("recording_pid", "1234");
-    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+    await LocalStorage.setItem(
+      "audio_path",
+      "/tmp/test-support/recording-123.wav",
+    );
 
     vi.spyOn(process, "kill").mockImplementation(() => true);
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(statSync).mockReturnValue({ size: 500 } as ReturnType<typeof statSync>);
+    vi.mocked(statSync).mockReturnValue({ size: 500 } as ReturnType<
+      typeof statSync
+    >);
 
     await runCommand();
 
@@ -271,11 +346,16 @@ describe("toggle-dictation Command", () => {
     });
 
     await LocalStorage.setItem("recording_pid", "1234");
-    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+    await LocalStorage.setItem(
+      "audio_path",
+      "/tmp/test-support/recording-123.wav",
+    );
 
     vi.spyOn(process, "kill").mockImplementation(() => true);
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<
+      typeof statSync
+    >);
     vi.mocked(transcribe).mockResolvedValue("pasted text");
 
     await runCommand();
@@ -286,16 +366,25 @@ describe("toggle-dictation Command", () => {
 
   it("shows error HUD when transcription fails", async () => {
     await LocalStorage.setItem("recording_pid", "1234");
-    await LocalStorage.setItem("audio_path", "/tmp/test-support/recording-123.wav");
+    await LocalStorage.setItem(
+      "audio_path",
+      "/tmp/test-support/recording-123.wav",
+    );
 
     vi.spyOn(process, "kill").mockImplementation(() => true);
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<typeof statSync>);
+    vi.mocked(statSync).mockReturnValue({ size: 5000 } as ReturnType<
+      typeof statSync
+    >);
     vi.mocked(transcribe).mockRejectedValue(new Error("model crashed"));
 
     await runCommand();
 
-    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("Transcription failed"));
-    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("model crashed"));
+    expect(showHUDSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Transcription failed"),
+    );
+    expect(showHUDSpy).toHaveBeenCalledWith(
+      expect.stringContaining("model crashed"),
+    );
   });
 });

@@ -36,7 +36,8 @@ const BUILTIN_PROCESSORS: PostProcessor[] = [
   {
     id: "builtin-remove-filler",
     name: "Remove Filler Words",
-    prompt: "Remove filler words like 'um', 'uh', 'like', 'you know', 'basically', 'so', 'I mean'",
+    prompt:
+      "Remove filler words like 'um', 'uh', 'like', 'you know', 'basically', 'so', 'I mean'",
     enabled: false,
     builtin: true,
   },
@@ -50,14 +51,16 @@ const BUILTIN_PROCESSORS: PostProcessor[] = [
   {
     id: "builtin-professional-tone",
     name: "Professional Tone",
-    prompt: "Rewrite in a polished, professional tone suitable for business communication",
+    prompt:
+      "Rewrite in a polished, professional tone suitable for business communication",
     enabled: false,
     builtin: true,
   },
   {
     id: "builtin-pirate",
     name: "Pirate",
-    prompt: "Transform into pirate speak, using playful and colorful language typical of a pirate's lingo. Maintain the essence of the original text while giving it a swashbuckling twist!",
+    prompt:
+      "Transform into pirate speak, using playful and colorful language typical of a pirate's lingo. Maintain the essence of the original text while giving it a swashbuckling twist!",
     enabled: false,
     builtin: true,
   },
@@ -80,7 +83,9 @@ export async function loadProcessors(): Promise<PostProcessor[]> {
   return [...BUILTIN_PROCESSORS];
 }
 
-export async function saveProcessors(processors: PostProcessor[]): Promise<void> {
+export async function saveProcessors(
+  processors: PostProcessor[],
+): Promise<void> {
   await LocalStorage.setItem(STORAGE_KEY, JSON.stringify(processors));
 }
 
@@ -94,12 +99,16 @@ export interface PostProcessingResult {
   appliedProcessors: string[];
 }
 
-export async function runPostProcessing(text: string): Promise<PostProcessingResult> {
+export async function runPostProcessing(
+  text: string,
+): Promise<PostProcessingResult> {
   const processors = await loadProcessors();
   const enabled = processors.filter((p) => p.enabled);
   if (enabled.length === 0) return { text, appliedProcessors: [] };
 
-  const instructions = enabled.map((p, i) => `${i + 1}. ${getEffectivePrompt(p)}`).join("\n");
+  const instructions = enabled
+    .map((p, i) => `${i + 1}. ${getEffectivePrompt(p)}`)
+    .join("\n");
 
   const dictionary = await loadDictionary();
   const dictionaryClause =
@@ -115,7 +124,15 @@ Return ONLY the processed text, nothing else.
 Text: """${text}"""`;
 
   const { aiModel } = getPreferenceValues<{ aiModel?: string }>();
-  const model = aiModel ? AI.Model[aiModel as keyof typeof AI.Model] : undefined;
-  const result = await AI.ask(prompt, { creativity: "low", ...(model && { model }) });
-  return { text: result, appliedProcessors: enabled.map((p) => getEffectiveName(p)) };
+  const model = aiModel
+    ? AI.Model[aiModel as keyof typeof AI.Model]
+    : undefined;
+  const result = await AI.ask(prompt, {
+    creativity: "low",
+    ...(model && { model }),
+  });
+  return {
+    text: result,
+    appliedProcessors: enabled.map((p) => getEffectiveName(p)),
+  };
 }

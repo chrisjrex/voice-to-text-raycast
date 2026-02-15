@@ -1,10 +1,11 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "voice-to-text",
-  "title": "Voice-to-Text",
+  "title": "Voice-To-Text",
   "description": "Voice-to-text and Text-to-Speech with local models",
   "icon": "icon.png",
   "author": "rex",
+  "categories": ["Productivity"],
   "license": "MIT",
   "commands": [
     {

@@ -34,19 +34,27 @@ vi.mock("../models", () => ({
   ensureDefaultTtsVoice: vi.fn(async () => {}),
 }));
 
-import { speakText, isKokoroServerRunning, buildKokoroServerScript } from "../read-aloud";
+import {
+  speakText,
+  isKokoroServerRunning,
+  buildKokoroServerScript,
+} from "../read-aloud";
 import { readFileSync, existsSync } from "fs";
 import { createConnection } from "net";
 import { spawn } from "child_process";
 import { EventEmitter } from "events";
-import { getActiveSystemVoice, getActiveKokoroVoice, getActiveTtsVoice, isTtsVoiceDownloaded } from "../models";
+import {
+  getActiveSystemVoice,
+  getActiveKokoroVoice,
+  getActiveTtsVoice,
+  isTtsVoiceDownloaded,
+} from "../models";
 import * as raycastApi from "@raycast/api";
 import { _setPrefs, _setSelectedText, _setClipboardText } from "@raycast/api";
 
 _setPrefs({ pythonPath: "/opt/homebrew/bin/python3", kokoroPythonPath: "" });
 
 const showHUDSpy = vi.spyOn(raycastApi, "showHUD");
-const updateMetadataSpy = vi.spyOn(raycastApi, "updateCommandMetadata");
 
 describe("Read Aloud Command", () => {
   beforeEach(() => {
@@ -54,7 +62,9 @@ describe("Read Aloud Command", () => {
     _setSelectedText("");
     _setClipboardText(undefined);
     // Default: not playing (readFileSync throws → isPlaying returns false)
-    vi.mocked(readFileSync).mockImplementation(() => { throw new Error("ENOENT"); });
+    vi.mocked(readFileSync).mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
     vi.mocked(existsSync).mockReturnValue(false);
     // Default: system voice active so speakText succeeds
     vi.mocked(getActiveSystemVoice).mockResolvedValue("Samantha");
@@ -73,7 +83,11 @@ describe("Read Aloud Command", () => {
     await runCommand();
 
     expect(showHUDSpy).toHaveBeenCalledWith("Speaking...");
-    expect(spawn).toHaveBeenCalledWith("say", expect.arrayContaining(["Hello world"]), expect.anything());
+    expect(spawn).toHaveBeenCalledWith(
+      "say",
+      expect.arrayContaining(["Hello world"]),
+      expect.anything(),
+    );
   });
 
   it("falls back to clipboard when no text is selected", async () => {
@@ -83,7 +97,11 @@ describe("Read Aloud Command", () => {
     await runCommand();
 
     expect(showHUDSpy).toHaveBeenCalledWith("Speaking...");
-    expect(spawn).toHaveBeenCalledWith("say", expect.arrayContaining(["clipboard content"]), expect.anything());
+    expect(spawn).toHaveBeenCalledWith(
+      "say",
+      expect.arrayContaining(["clipboard content"]),
+      expect.anything(),
+    );
   });
 
   it("shows error when no text anywhere", async () => {
@@ -92,7 +110,9 @@ describe("Read Aloud Command", () => {
 
     await runCommand();
 
-    expect(showHUDSpy).toHaveBeenCalledWith("No text selected and clipboard is empty");
+    expect(showHUDSpy).toHaveBeenCalledWith(
+      "No text selected and clipboard is empty",
+    );
   });
 
   it("stops playback when already playing and no new text", async () => {
@@ -126,7 +146,9 @@ describe("Read Aloud Command", () => {
 
     await runCommand();
 
-    expect(showHUDSpy).toHaveBeenCalledWith(expect.stringContaining("TTS failed"));
+    expect(showHUDSpy).toHaveBeenCalledWith(
+      expect.stringContaining("TTS failed"),
+    );
   });
 });
 
@@ -194,8 +216,12 @@ describe("speakText voice selection", () => {
     const mockProc = new EventEmitter();
     (mockProc as unknown as Record<string, unknown>).pid = 5678;
     (mockProc as unknown as Record<string, unknown>).unref = vi.fn();
-    (mockProc as unknown as Record<string, unknown>).stdin = { write: vi.fn(), end: vi.fn() };
-    (mockProc as unknown as Record<string, unknown>).stderr = new EventEmitter();
+    (mockProc as unknown as Record<string, unknown>).stdin = {
+      write: vi.fn(),
+      end: vi.fn(),
+    };
+    (mockProc as unknown as Record<string, unknown>).stderr =
+      new EventEmitter();
     vi.mocked(spawn).mockReturnValue(mockProc as never);
 
     const promise = speakText("hello");
@@ -252,8 +278,12 @@ describe("speakText voice selection", () => {
     const mockProc = new EventEmitter();
     (mockProc as unknown as Record<string, unknown>).pid = 5678;
     (mockProc as unknown as Record<string, unknown>).unref = vi.fn();
-    (mockProc as unknown as Record<string, unknown>).stdin = { write: vi.fn(), end: vi.fn() };
-    (mockProc as unknown as Record<string, unknown>).stderr = new EventEmitter();
+    (mockProc as unknown as Record<string, unknown>).stdin = {
+      write: vi.fn(),
+      end: vi.fn(),
+    };
+    (mockProc as unknown as Record<string, unknown>).stderr =
+      new EventEmitter();
     vi.mocked(spawn).mockReturnValue(mockProc as never);
 
     const promise = speakText("hello");

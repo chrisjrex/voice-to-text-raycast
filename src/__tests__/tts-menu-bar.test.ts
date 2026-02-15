@@ -7,7 +7,12 @@ vi.mock("child_process", async (importOriginal) => {
 
 import { LocalStorage } from "@raycast/api";
 import { execFile } from "child_process";
-import { getCachedEngineState, refreshEngineState, CACHE_KOKORO, CACHE_PIPER } from "../tts-menu-bar";
+import {
+  getCachedEngineState,
+  refreshEngineState,
+  CACHE_KOKORO,
+  CACHE_PIPER,
+} from "../tts-menu-bar";
 
 describe("getCachedEngineState", () => {
   beforeEach(async () => {
@@ -41,7 +46,11 @@ describe("refreshEngineState", () => {
       return {} as ReturnType<typeof execFile>;
     });
 
-    const result = await refreshEngineState(CACHE_KOKORO, "/usr/bin/python3", "kokoro");
+    const result = await refreshEngineState(
+      CACHE_KOKORO,
+      "/usr/bin/python3",
+      "kokoro",
+    );
 
     expect(result).toBe(true);
     expect(await LocalStorage.getItem<boolean>(CACHE_KOKORO)).toBe(true);
@@ -49,11 +58,16 @@ describe("refreshEngineState", () => {
 
   it("checks real state and caches false when not installed", async () => {
     vi.mocked(execFile).mockImplementation((_cmd, _args, _opts, cb) => {
-      if (typeof cb === "function") (cb as (err: Error | null) => void)(new Error("No module"));
+      if (typeof cb === "function")
+        (cb as (err: Error | null) => void)(new Error("No module"));
       return {} as ReturnType<typeof execFile>;
     });
 
-    const result = await refreshEngineState(CACHE_PIPER, "/usr/bin/python3", "piper");
+    const result = await refreshEngineState(
+      CACHE_PIPER,
+      "/usr/bin/python3",
+      "piper",
+    );
 
     expect(result).toBe(false);
     expect(await LocalStorage.getItem<boolean>(CACHE_PIPER)).toBe(false);
@@ -63,11 +77,16 @@ describe("refreshEngineState", () => {
     await LocalStorage.setItem(CACHE_KOKORO, true);
 
     vi.mocked(execFile).mockImplementation((_cmd, _args, _opts, cb) => {
-      if (typeof cb === "function") (cb as (err: Error | null) => void)(new Error("No module"));
+      if (typeof cb === "function")
+        (cb as (err: Error | null) => void)(new Error("No module"));
       return {} as ReturnType<typeof execFile>;
     });
 
-    const result = await refreshEngineState(CACHE_KOKORO, "/usr/bin/python3", "kokoro");
+    const result = await refreshEngineState(
+      CACHE_KOKORO,
+      "/usr/bin/python3",
+      "kokoro",
+    );
 
     expect(result).toBe(false);
     expect(await LocalStorage.getItem<boolean>(CACHE_KOKORO)).toBe(false);
