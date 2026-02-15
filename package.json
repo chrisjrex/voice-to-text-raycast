@@ -11,13 +11,69 @@
       "name": "toggle-dictation",
       "title": "Transcribe",
       "description": "Start/stop local voice-to-text recording",
-      "mode": "no-view"
+      "mode": "no-view",
+      "preferences": [
+        {
+          "name": "copyToClipboard",
+          "type": "checkbox",
+          "title": "Transcription Output",
+          "description": "Copy transcribed text to clipboard",
+          "default": true,
+          "required": false,
+          "label": "Copy to Clipboard"
+        },
+        {
+          "name": "pasteToActiveApp",
+          "type": "checkbox",
+          "title": "",
+          "description": "Paste transcribed text into the focused text field",
+          "default": true,
+          "required": false,
+          "label": "Paste to Active App"
+        },
+        {
+          "name": "saveHistory",
+          "type": "checkbox",
+          "title": "Save Transcription History",
+          "description": "Save transcriptions to history for later review",
+          "default": true,
+          "required": false,
+          "label": "Enable"
+        },
+        {
+          "name": "silenceTimeout",
+          "type": "textfield",
+          "title": "Silence Timeout (seconds)",
+          "description": "Auto-stop recording after this many seconds of silence. Set to 0 to disable.",
+          "default": "15",
+          "required": false
+        }
+      ]
     },
     {
       "name": "manage-models",
       "title": "Manage Models",
       "description": "View and download voice-to-text models",
-      "mode": "view"
+      "mode": "view",
+      "preferences": [
+        {
+          "name": "enablePiper",
+          "type": "checkbox",
+          "title": "TTS Engines",
+          "label": "Piper (fast, CPU, CLI)",
+          "description": "Enable Piper TTS engine. Requires: pip install piper-tts",
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "enableKokoro",
+          "type": "checkbox",
+          "label": "Kokoro (82M params, Python)",
+          "description": "Enable Kokoro TTS engine. Requires: pip install kokoro",
+          "required": false,
+          "default": true
+        }
+      ]
     },
     {
       "name": "manage-post-processing",
@@ -48,7 +104,17 @@
       "title": "TTS Status",
       "description": "Shows TTS engine status and controls in the menu bar",
       "mode": "menu-bar",
-      "interval": "1m"
+      "interval": "1m",
+      "preferences": [
+        {
+          "name": "kokoroIdleTimeout",
+          "type": "textfield",
+          "title": "Kokoro Idle Timeout (seconds)",
+          "description": "Auto-shutdown the Kokoro server after this many seconds of inactivity. Set to 0 to disable.",
+          "default": "120",
+          "required": false
+        }
+      ]
     }
   ],
   "preferences": [
@@ -66,70 +132,10 @@
       ]
     },
     {
-      "name": "copyToClipboard",
-      "type": "checkbox",
-      "title": "Transcription Output",
-      "description": "Copy transcribed text to clipboard",
-      "default": true,
-      "required": false,
-      "label": "Copy to Clipboard"
-    },
-    {
-      "name": "pasteToActiveApp",
-      "type": "checkbox",
-      "title": "",
-      "description": "Paste transcribed text into the focused text field",
-      "default": true,
-      "required": false,
-      "label": "Paste to Active App"
-    },
-    {
-      "name": "saveHistory",
-      "type": "checkbox",
-      "title": "Save Transcription History",
-      "description": "Save transcriptions to history for later review",
-      "default": true,
-      "required": false,
-      "label": "Enable"
-    },
-    {
-      "name": "silenceTimeout",
-      "type": "textfield",
-      "title": "Transcription Silence Timeout (seconds)",
-      "description": "Auto-stop recording after this many seconds of silence. Set to 0 to disable.",
-      "default": "15",
-      "required": false
-    },
-    {
-      "name": "enablePiper",
-      "type": "checkbox",
-      "title": "TTS Engines",
-      "label": "Piper (fast, CPU, CLI)",
-      "description": "Enable Piper TTS engine. Requires: pip install piper-tts",
-      "required": false,
-      "default": false
-    },
-    {
-      "name": "enableKokoro",
-      "type": "checkbox",
-      "label": "Kokoro (82M params, Python)",
-      "description": "Enable Kokoro TTS engine. Requires: pip install kokoro",
-      "required": false,
-      "default": false
-    },
-    {
-      "name": "kokoroIdleTimeout",
-      "type": "textfield",
-      "title": "Kokoro Idle Timeout (seconds)",
-      "description": "Auto-shutdown the Kokoro server after this many seconds of inactivity. Set to 0 to disable.",
-      "default": "120",
-      "required": false
-    },
-    {
       "name": "kokoroPythonPath",
       "type": "textfield",
       "title": "Kokoro Python Path",
-      "description": "Dedicated venv for Kokoro — kept separate to avoid dependency conflicts with STT/Piper packages",
+      "description": "Python 3.10–3.12 with a dedicated venv for Kokoro (requires spacy/blis which don't support 3.13+)",
       "default": "~/.local/lib-kokoro/venv/bin/python3",
       "required": false
     },

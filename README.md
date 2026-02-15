@@ -6,8 +6,6 @@ Local voice-to-text and text-to-speech for Raycast. Everything runs on-device �
 
 ## Installation
 
-Install everything with one block — this enables both speech-to-text and text-to-speech:
-
 ```bash
 # Recording (required for dictation)
 brew install sox
@@ -15,32 +13,71 @@ brew install sox
 # Speech-to-text — pick one or both:
 pip3 install mlx-whisper    # multilingual
 pip3 install parakeet-mlx   # English-only, generally faster
-
-# Text-to-speech packages are auto-installed on first voice download
-# (or skip TTS entirely and use macOS system voices)
 ```
 
 Then in Raycast:
 
 1. Open **Manage Models**
 2. Download at least one STT model and set it as active
-3. *(Optional)* Scroll to TTS voices, download one, and set it as active — or select a built-in macOS system voice
+3. *(Optional)* Download a TTS voice and set it as active, or select a macOS system voice
 
-You're ready — run **Transcribe** to dictate, **Read Aloud** to speak text.
+Run **Transcribe** to dictate, **Read Aloud** to speak text.
 
 ---
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| **Transcribe** | Start/stop recording. Transcribes on stop, copies result to clipboard, and pastes it. |
-| **Read Aloud** | Speaks the selected text (or clipboard contents) using a local TTS voice. |
-| **Manage Models** | Browse, download, and select STT models and TTS voices. |
-| **Manage Post-Processing** | Enable AI-powered transformations (grammar fix, filler word removal, tone adjustment, etc.). |
-| **Manage Dictionary** | Add protected terms (e.g. "CCY", "Seamus") that AI post-processing must preserve exactly. |
-| **Transcription History** | Browse and manage past transcriptions. |
-| **Toggle Kokoro Server** | Start or stop the persistent Kokoro TTS server. |
+### Transcribe
+
+Start/stop recording. Transcribes on stop, then copies and/or pastes the result.
+
+**Settings** (Raycast Settings > Extensions > Voice-to-Text > Transcribe):
+
+| Setting | Default | Description |
+|---|---|---|
+| Copy to Clipboard | On | Copy transcribed text to clipboard |
+| Paste to Active App | On | Paste transcribed text into the focused text field |
+| Save Transcription History | On | Save transcriptions for later review |
+| Silence Timeout | 15s | Auto-stop after this many seconds of silence (0 to disable) |
+
+### Read Aloud
+
+Speaks the selected text (or clipboard contents) using a local TTS voice. Run again with no selection to stop playback.
+
+If the Kokoro server is running (via TTS Status), Read Aloud uses it for instant responses. Otherwise it does a cold start — loads the model, generates audio, and exits. Cold starts are slower (~5–10s) but require no background process.
+
+### Manage Models
+
+Browse, download, and select STT models and TTS voices.
+
+**Settings** (Raycast Settings > Extensions > Voice-to-Text > Manage Models):
+
+| Setting | Default | Description |
+|---|---|---|
+| Piper | On | Show Piper TTS voices |
+| Kokoro | On | Show Kokoro TTS voices |
+
+### Manage Post-Processing
+
+Enable AI-powered transformations on transcriptions — grammar fixes, filler word removal, tone adjustment, and custom processors. Requires Raycast AI (Pro).
+
+### Manage Dictionary
+
+Add protected terms (e.g. "CCY", "Seamus") that AI post-processing must preserve exactly.
+
+### Transcription History
+
+Browse and manage past transcriptions.
+
+### TTS Status (Menu Bar)
+
+Shows a menu bar icon with TTS engine status. Controls for starting/stopping the Kokoro server and installing/uninstalling TTS engines.
+
+**Settings** (Raycast Settings > Extensions > Voice-to-Text > TTS Status):
+
+| Setting | Default | Description |
+|---|---|---|
+| Kokoro Idle Timeout | 120s | Auto-shutdown the Kokoro server after this many seconds of inactivity (0 to disable) |
 
 ---
 
@@ -68,7 +105,7 @@ All models run locally via Apple MLX. Download and manage them through **Manage 
 
 ## Text-to-Speech
 
-Three TTS options are available. All are managed through **Manage Models** — pick a voice and set it as active.
+Three TTS options, all managed through **Manage Models**.
 
 ### macOS System Voices (no install needed)
 
@@ -78,43 +115,62 @@ Available voices: Samantha, Alex, Daniel, Karen, Moira, Tessa, Fiona, Veena.
 
 ### Kokoro (best quality)
 
-82M-parameter neural TTS. Runs a local Python server with 2-minute idle auto-shutdown.
+82M-parameter neural TTS. 21 voices across US and British English.
 
-Voices are downloaded individually (~500KB each). The first voice you download will also install the Python packages (`kokoro`, `soundfile`, `numpy`, ~50MB) and fetch the Kokoro voice engine (~312MB) — this is a one-time setup shared by all voices. 21 voices available across US and British English, male and female.
+Voices are downloaded individually (~500KB each). The first download also installs the Python packages and fetches the voice engine (~362MB total) — this is a one-time setup shared by all voices.
 
-If the last Kokoro voice is deleted, you'll be offered the option to uninstall the engine and Python packages.
-
-Use **Toggle Kokoro Server** to manually start/stop the server, or let it start automatically on first use.
+**Cold start vs warm server:** Without the server running, Read Aloud does a cold start each time (~5–10s) — it loads the model, generates audio, and exits. To get near-instant responses, start the Kokoro server from the **TTS Status** menu bar. The server keeps the model in memory and auto-shuts down after the configured idle timeout (default: 2 minutes).
 
 ### Piper (lightweight, CPU)
 
-Fast open-source voice synthesizer from [Rhasspy](https://github.com/rhasspy/piper).
+Fast open-source voice synthesizer. 5 voices across US and British English.
 
-Voices are downloaded individually (~60MB each). The first voice you download will also install `piper-tts` (~24MB) — this is a one-time install shared by all voices. 5 voices available across US and British English, male and female.
-
-If the last Piper voice is deleted, you'll be offered the option to uninstall the engine.
+Voices are downloaded individually (~60MB each). The first download also installs `piper-tts` (~24MB).
 
 ---
 
-## Preferences
+## Extension Settings
 
-| Preference | Default | Description |
+These apply across all commands (Raycast Settings > Extensions > Voice-to-Text):
+
+| Setting | Default | Description |
 |---|---|---|
-| Sox Path | `/opt/homebrew/bin/sox` | Path to `sox` binary |
-| Python Path | `/opt/homebrew/bin/python3` | Path to `python3` with mlx-whisper or parakeet-mlx |
-| Kokoro Python Path | `~/.local/lib-kokoro/venv/bin/python3` | Path to `python3` with kokoro installed |
-| Save Transcription History | Enabled | Save transcriptions for later review |
-| Copy to Clipboard | Enabled | Copy transcribed text to clipboard |
-| Paste to Active App | Enabled | Paste transcribed text into the focused text field |
-| Silence Timeout | 15 seconds | Auto-stop after this many seconds of silence (0 to disable) |
+| Post-Processing Model | GPT-4o Mini | AI model for post-processing transcriptions |
+| Python Path | `/opt/homebrew/bin/python3` | Python 3.10+ with mlx-whisper or parakeet-mlx |
+| Kokoro Python Path | `~/.local/lib-kokoro/venv/bin/python3` | Python 3.10–3.12 for Kokoro (separate venv) |
+| Sox Path | `/opt/homebrew/bin/sox` | Path to sox binary for audio recording |
 
 ---
 
-## Additional Information
+## Cleanup
 
-### Downloading all Kokoro voices at once
+### Uninstall TTS engines
 
-By default, Kokoro voices are downloaded individually. If you'd prefer to download the model and all voices in one go, you can use `snapshot_download` directly:
+Use the **TTS Status** menu bar to uninstall Kokoro or Piper. This removes the Python packages and downloaded voices.
+
+### Remove STT models
+
+Downloaded models are cached in `~/.cache/huggingface/hub/`. Delete specific model directories to free space:
+
+```bash
+# List downloaded models
+ls ~/.cache/huggingface/hub/ | grep models--
+
+# Remove a specific model (e.g. whisper-tiny)
+rm -rf ~/.cache/huggingface/hub/models--mlx-community--whisper-tiny
+```
+
+### Full uninstall
+
+1. Uninstall TTS engines from **TTS Status** menu bar
+2. Remove STT models from `~/.cache/huggingface/hub/`
+3. Remove the extension from Raycast
+
+---
+
+## Downloading all Kokoro voices at once
+
+By default, Kokoro voices are downloaded individually. To download the model and all voices in one go:
 
 ```bash
 python3 -c 'from huggingface_hub import snapshot_download; snapshot_download("hexgrad/Kokoro-82M")'

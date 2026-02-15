@@ -9,7 +9,6 @@ import { getActiveTtsVoice, getActiveKokoroVoice, getActiveSystemVoice, isTtsVoi
 interface Preferences {
   pythonPath: string;
   kokoroPythonPath: string;
-  kokoroIdleTimeout: string;
 }
 
 const KOKORO_SOCK = `/tmp/kokoro_tts_${process.getuid?.() ?? 0}.sock`;
@@ -18,7 +17,9 @@ const KOKORO_SERVER_SCRIPT = join(environment.supportPath, "kokoro_server.py");
 
 function resolveKokoroPython(prefs: Preferences): string {
   const raw = prefs.kokoroPythonPath || "~/.local/lib-kokoro/venv/bin/python3";
-  return raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
+  const resolved = raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
+  if (!prefs.kokoroPythonPath && !existsSync(resolved)) return prefs.pythonPath;
+  return resolved;
 }
 
 function buildKokoroServerScript(idleTimeout = 120): string {
@@ -205,6 +206,40 @@ function startPlayback(outputPath: string): void {
   player.unref();
 }
 
+async function speakWithKokoroColdStart(text: string, pythonPath: string, voice: string): Promise<void> {
+  const outputPath = join(environment.supportPath, `tts-${Date.now()}.wav`);
+  const v = voice || "af_heart";
+  const script = `
+import sys, json, numpy as np, soundfile as sf
+from kokoro import KPipeline
+req = json.loads(sys.stdin.readline())
+pipeline = KPipeline(lang_code=req["voice"][0])
+chunks = [audio for _, _, audio in pipeline(req["text"], voice=req["voice"])]
+sf.write(req["output"], np.concatenate(chunks), 24000)
+`.trim();
+
+  const input = JSON.stringify({ text, voice: v, output: outputPath }) + "\n";
+  const env = { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}` };
+
+  await new Promise<void>((resolve, reject) => {
+    const proc = spawn(pythonPath, ["-c", script], {
+      stdio: ["pipe", "ignore", "pipe"],
+      env,
+    });
+    proc.stdin.write(input);
+    proc.stdin.end();
+    let stderr = "";
+    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+    proc.on("close", (code) => {
+      if (code !== 0) reject(new Error(stderr || `kokoro exited with code ${code}`));
+      else resolve();
+    });
+    proc.on("error", reject);
+  });
+
+  startPlayback(outputPath);
+}
+
 async function speakWithPiper(text: string, pythonPath: string, voiceId: string): Promise<void> {
   const outputPath = join(environment.supportPath, `tts-${Date.now()}.wav`);
   const dataDir = ttsVoicesDir();
@@ -258,13 +293,12 @@ export async function speakText(text: string): Promise<void> {
   }
 
   if (activeKokoro) {
-    const kokoroPython = resolveKokoroPython(prefs);
-    if (!await isKokoroServerRunning()) {
-      await showHUD("Starting Kokoro server...");
-      const idleTimeout = Math.max(0, parseInt(prefs.kokoroIdleTimeout, 10) || 120);
-      await startKokoroServer(kokoroPython, idleTimeout);
+    if (await isKokoroServerRunning()) {
+      await speakWithKokoroServer(text, activeKokoro);
+    } else {
+      const kokoroPython = resolveKokoroPython(prefs);
+      await speakWithKokoroColdStart(text, kokoroPython, activeKokoro);
     }
-    await speakWithKokoroServer(text, activeKokoro);
     return;
   }
 

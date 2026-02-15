@@ -14,7 +14,9 @@ interface Preferences {
 
 function resolveKokoroPython(prefs: Preferences): string {
   const raw = prefs.kokoroPythonPath || "~/.local/lib-kokoro/venv/bin/python3";
-  return raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
+  const resolved = raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
+  if (!prefs.kokoroPythonPath && !existsSync(resolved)) return prefs.pythonPath;
+  return resolved;
 }
 
 export const CACHE_KOKORO = "menubar_kokoro_installed";

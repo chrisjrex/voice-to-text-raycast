@@ -215,24 +215,59 @@ describe("speakText voice selection", () => {
     await expect(speakText("hello")).rejects.toThrow("No TTS voice set");
   });
 
-  it("auto-starts kokoro server when not running", async () => {
-    vi.useFakeTimers();
+  it("uses kokoro server when server is running", async () => {
+    vi.mocked(getActiveSystemVoice).mockResolvedValue(undefined);
+    vi.mocked(getActiveKokoroVoice).mockResolvedValue("af_heart");
+    vi.mocked(getActiveTtsVoice).mockResolvedValue(undefined);
+    vi.mocked(existsSync).mockReturnValue(true);
 
+    vi.mocked(createConnection).mockImplementation(() => {
+      const emitter = new EventEmitter();
+      (emitter as unknown as Record<string, unknown>).destroy = vi.fn();
+      (emitter as unknown as Record<string, unknown>).write = vi.fn();
+      // Auto-connect on next tick for the server check
+      setTimeout(() => emitter.emit("connect"), 0);
+      // Auto-respond ok on next tick for the speak request
+      setTimeout(() => emitter.emit("data", Buffer.from("ok\n")), 5);
+      return emitter as never;
+    });
+
+    await speakText("hello");
+
+    // Should have used the server (createConnection called twice), not spawned a cold start process
+    expect(createConnection).toHaveBeenCalledTimes(2);
+    expect(spawn).not.toHaveBeenCalledWith(
+      expect.any(String),
+      expect.arrayContaining(["-c"]),
+      expect.anything(),
+    );
+  });
+
+  it("does cold start when kokoro server is not running", async () => {
     vi.mocked(getActiveSystemVoice).mockResolvedValue(undefined);
     vi.mocked(getActiveKokoroVoice).mockResolvedValue("af_heart");
     vi.mocked(getActiveTtsVoice).mockResolvedValue(undefined);
     vi.mocked(existsSync).mockReturnValue(false);
 
-    const promise = speakText("hello").catch((e: Error) => e);
-    for (let i = 0; i < 20; i++) {
-      await vi.advanceTimersByTimeAsync(500);
-    }
+    const mockProc = new EventEmitter();
+    (mockProc as unknown as Record<string, unknown>).pid = 5678;
+    (mockProc as unknown as Record<string, unknown>).unref = vi.fn();
+    (mockProc as unknown as Record<string, unknown>).stdin = { write: vi.fn(), end: vi.fn() };
+    (mockProc as unknown as Record<string, unknown>).stderr = new EventEmitter();
+    vi.mocked(spawn).mockReturnValue(mockProc as never);
 
-    const result = await promise;
-    expect(result).toBeInstanceOf(Error);
-    expect(spawn).toHaveBeenCalled();
+    const promise = speakText("hello");
+    setTimeout(() => mockProc.emit("close", 0), 10);
+    await promise;
 
-    vi.useRealTimers();
+    // Should spawn python with -c (cold start script), not start a server
+    expect(spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.arrayContaining(["-c"]),
+      expect.anything(),
+    );
+    // Should NOT have tried to connect to the server to speak
+    expect(createConnection).not.toHaveBeenCalled();
   });
 });
 

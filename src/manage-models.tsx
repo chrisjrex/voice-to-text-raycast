@@ -1,6 +1,6 @@
 import { Action, ActionPanel, Alert, Color, Icon, List, confirmAlert, environment, getPreferenceValues, showToast, Toast } from "@raycast/api";
 import { ChildProcess, execFile, spawn } from "child_process";
-import { rmSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, rmSync, unlinkSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { useState, useCallback, useRef, useEffect } from "react";
@@ -26,7 +26,9 @@ interface Preferences {
 
 function resolveKokoroPython(prefs: Preferences): string {
   const raw = prefs.kokoroPythonPath || "~/.local/lib-kokoro/venv/bin/python3";
-  return raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
+  const resolved = raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
+  if (!prefs.kokoroPythonPath && !existsSync(resolved)) return prefs.pythonPath;
+  return resolved;
 }
 
 // --- Reusable download hook ---

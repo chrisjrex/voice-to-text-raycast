@@ -10,21 +10,7 @@
 type ExtensionPreferences = {
   /** Post-Processing Model - AI model used for post-processing transcriptions. Requires Raycast AI (Pro). */
   "aiModel": "OpenAI_GPT-4o_mini" | "Google_Gemini_3_Flash" | "Anthropic_Claude_4.5_Haiku",
-  /** Transcription Output - Copy transcribed text to clipboard */
-  "copyToClipboard": boolean,
-  /**  - Paste transcribed text into the focused text field */
-  "pasteToActiveApp": boolean,
-  /** Save Transcription History - Save transcriptions to history for later review */
-  "saveHistory": boolean,
-  /** Transcription Silence Timeout (seconds) - Auto-stop recording after this many seconds of silence. Set to 0 to disable. */
-  "silenceTimeout": string,
-  /** TTS Engines - Enable Piper TTS engine. Requires: pip install piper-tts */
-  "enablePiper": boolean,
-  /** undefined - Enable Kokoro TTS engine. Requires: pip install kokoro */
-  "enableKokoro": boolean,
-  /** Kokoro Idle Timeout (seconds) - Auto-shutdown the Kokoro server after this many seconds of inactivity. Set to 0 to disable. */
-  "kokoroIdleTimeout": string,
-  /** Kokoro Python Path - Dedicated venv for Kokoro — kept separate to avoid dependency conflicts with STT/Piper packages */
+  /** Kokoro Python Path - Python 3.10–3.12 with a dedicated venv for Kokoro (requires spacy/blis which don't support 3.13+) */
   "kokoroPythonPath": string,
   /** Python Path [3.10+] - Python with mlx-whisper or parakeet-mlx installed. Used for speech-to-text transcription and Piper TTS */
   "pythonPath": string,
@@ -37,9 +23,23 @@ declare type Preferences = ExtensionPreferences
 
 declare namespace Preferences {
   /** Preferences accessible in the `toggle-dictation` command */
-  export type ToggleDictation = ExtensionPreferences & {}
+  export type ToggleDictation = ExtensionPreferences & {
+  /** Transcription Output - Copy transcribed text to clipboard */
+  "copyToClipboard": boolean,
+  /**  - Paste transcribed text into the focused text field */
+  "pasteToActiveApp": boolean,
+  /** Save Transcription History - Save transcriptions to history for later review */
+  "saveHistory": boolean,
+  /** Silence Timeout (seconds) - Auto-stop recording after this many seconds of silence. Set to 0 to disable. */
+  "silenceTimeout": string
+}
   /** Preferences accessible in the `manage-models` command */
-  export type ManageModels = ExtensionPreferences & {}
+  export type ManageModels = ExtensionPreferences & {
+  /** TTS Engines - Enable Piper TTS engine. Requires: pip install piper-tts */
+  "enablePiper": boolean,
+  /** undefined - Enable Kokoro TTS engine. Requires: pip install kokoro */
+  "enableKokoro": boolean
+}
   /** Preferences accessible in the `manage-post-processing` command */
   export type ManagePostProcessing = ExtensionPreferences & {}
   /** Preferences accessible in the `manage-dictionary` command */
@@ -49,7 +49,10 @@ declare namespace Preferences {
   /** Preferences accessible in the `read-aloud` command */
   export type ReadAloud = ExtensionPreferences & {}
   /** Preferences accessible in the `tts-menu-bar` command */
-  export type TtsMenuBar = ExtensionPreferences & {}
+  export type TtsMenuBar = ExtensionPreferences & {
+  /** Kokoro Idle Timeout (seconds) - Auto-shutdown the Kokoro server after this many seconds of inactivity. Set to 0 to disable. */
+  "kokoroIdleTimeout": string
+}
 }
 
 declare namespace Arguments {
