@@ -8,24 +8,28 @@
 /* eslint-disable @typescript-eslint/ban-types */
 
 type ExtensionPreferences = {
-  /** TTS Engine - Read transcribed text aloud after dictation. Piper needs: pip install piper-tts. Kokoro needs: pip install kokoro */
-  "ttsEngine": "none" | "piper" | "kokoro",
-  /** TTS Voice / Model - Piper: path to .onnx voice model file. Kokoro: voice name (e.g. af_heart) */
-  "ttsVoice": string,
-  /** Kokoro Python Path - Path to python3 with kokoro installed */
-  "kokoroPythonPath": string,
-  /** Sox Path - Path to sox binary */
-  "soxPath": string,
-  /** Python Path - Path to python3 binary with mlx-whisper or parakeet-mlx installed */
-  "pythonPath": string,
-  /** Save Transcription History - Save transcriptions to history for later review */
-  "saveHistory": boolean,
+  /** Post-Processing Model - AI model used for post-processing transcriptions. Requires Raycast AI (Pro). */
+  "aiModel": "OpenAI_GPT-4o_mini" | "Google_Gemini_3_Flash" | "Anthropic_Claude_4.5_Haiku",
   /** Transcription Output - Copy transcribed text to clipboard */
   "copyToClipboard": boolean,
   /**  - Paste transcribed text into the focused text field */
   "pasteToActiveApp": boolean,
-  /** Silence Timeout (seconds) - Auto-stop recording after this many seconds of silence. Set to 0 to disable. */
-  "silenceTimeout": string
+  /** Save Transcription History - Save transcriptions to history for later review */
+  "saveHistory": boolean,
+  /** Transcription Silence Timeout (seconds) - Auto-stop recording after this many seconds of silence. Set to 0 to disable. */
+  "silenceTimeout": string,
+  /** TTS Engines - Enable Piper TTS engine. Requires: pip install piper-tts */
+  "enablePiper": boolean,
+  /** undefined - Enable Kokoro TTS engine. Requires: pip install kokoro */
+  "enableKokoro": boolean,
+  /** Kokoro Idle Timeout (seconds) - Auto-shutdown the Kokoro server after this many seconds of inactivity. Set to 0 to disable. */
+  "kokoroIdleTimeout": string,
+  /** Kokoro Python Path - Dedicated venv for Kokoro — kept separate to avoid dependency conflicts with STT/Piper packages */
+  "kokoroPythonPath": string,
+  /** Python Path [3.10+] - Python with mlx-whisper or parakeet-mlx installed. Used for speech-to-text transcription and Piper TTS */
+  "pythonPath": string,
+  /** Sox Path [14.4+] - Sox is used for audio recording during voice transcription */
+  "soxPath": string
 }
 
 /** Preferences accessible in all the extension's commands */
@@ -44,8 +48,8 @@ declare namespace Preferences {
   export type TranscriptionHistory = ExtensionPreferences & {}
   /** Preferences accessible in the `read-aloud` command */
   export type ReadAloud = ExtensionPreferences & {}
-  /** Preferences accessible in the `toggle-kokoro-server` command */
-  export type ToggleKokoroServer = ExtensionPreferences & {}
+  /** Preferences accessible in the `tts-menu-bar` command */
+  export type TtsMenuBar = ExtensionPreferences & {}
 }
 
 declare namespace Arguments {
@@ -61,7 +65,7 @@ declare namespace Arguments {
   export type TranscriptionHistory = {}
   /** Arguments passed to the `read-aloud` command */
   export type ReadAloud = {}
-  /** Arguments passed to the `toggle-kokoro-server` command */
-  export type ToggleKokoroServer = {}
+  /** Arguments passed to the `tts-menu-bar` command */
+  export type TtsMenuBar = {}
 }
 

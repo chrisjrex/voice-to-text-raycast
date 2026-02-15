@@ -1,10 +1,10 @@
 import { Action, ActionPanel, Alert, Color, Icon, List, confirmAlert, environment, getPreferenceValues, showToast, Toast } from "@raycast/api";
 import { ChildProcess, execFile, spawn } from "child_process";
-import { existsSync, rmSync, unlinkSync, writeFileSync } from "fs";
+import { rmSync, unlinkSync, writeFileSync } from "fs";
 import { homedir } from "os";
-import { dirname, join } from "path";
+import { join } from "path";
 import { useState, useCallback, useRef, useEffect } from "react";
-import { MODELS, modelIdFromValue, modelCacheDir, isModelDownloaded, getActiveModel, setActiveModel, TTS_VOICES, isTtsVoiceDownloaded, getActiveTtsVoice, setActiveTtsVoice, ttsVoicesDir, ttsVoiceOnnxPath, TtsVoice, KOKORO_VOICES, KOKORO_MODEL_ID, isKokoroModelDownloaded, isKokoroVoiceDownloaded, deleteKokoroVoice, getActiveKokoroVoice, setActiveKokoroVoice, SYSTEM_VOICES, getActiveSystemVoice, setActiveSystemVoice, clearActiveSystemVoice, clearActiveKokoroVoice, clearActiveTtsVoice, ensureDefaultTtsVoice, isPythonPackageInstalled } from "./models";
+import { MODELS, modelIdFromValue, modelCacheDir, isModelDownloaded, getActiveModel, setActiveModel, TTS_VOICES, isTtsVoiceDownloaded, getActiveTtsVoice, setActiveTtsVoice, ttsVoicesDir, ttsVoiceOnnxPath, TtsVoice, KOKORO_VOICES, KOKORO_MODEL_ID, isKokoroModelDownloaded, isKokoroVoiceDownloaded, deleteKokoroVoice, getActiveKokoroVoice, setActiveKokoroVoice, SYSTEM_VOICES, getActiveSystemVoice, setActiveSystemVoice, clearActiveSystemVoice, clearActiveKokoroVoice, clearActiveTtsVoice, ensureDefaultTtsVoice, isPythonPackageInstalled, installPiperEngine, uninstallPiperEngine, installKokoroEngine, uninstallKokoroEngine } from "./models";
 import { stopCurrentPlayback, PLAYBACK_PID } from "./read-aloud";
 
 let activePreview: ChildProcess | null = null;
@@ -20,6 +20,8 @@ function stopPreview() {
 interface Preferences {
   pythonPath: string;
   kokoroPythonPath: string;
+  enablePiper: boolean;
+  enableKokoro: boolean;
 }
 
 function resolveKokoroPython(prefs: Preferences): string {
@@ -284,12 +286,7 @@ export default function Command() {
 
       const toast = await showToast({ style: Toast.Style.Animated, title: "Installing Piper engine..." });
       try {
-        await new Promise<void>((resolve, reject) => {
-          execFile(pythonPath, ["-m", "pip", "install", "--break-system-packages", "piper-tts"], { timeout: 300_000 }, (error) => {
-            if (error) reject(error);
-            else resolve();
-          });
-        });
+        await installPiperEngine(pythonPath);
         setPiperEngineInstalled(true);
         toast.style = Toast.Style.Success;
         toast.title = "Piper engine installed";
@@ -339,21 +336,7 @@ export default function Command() {
     if (!kokoroEngineInstalled) {
       const toast = await showToast({ style: Toast.Style.Animated, title: "Installing Kokoro packages..." });
       try {
-        if (!existsSync(kokoroPython)) {
-          const venvDir = dirname(dirname(kokoroPython));
-          await new Promise<void>((resolve, reject) => {
-            execFile(pythonPath, ["-m", "venv", venvDir], { timeout: 60_000 }, (error) => {
-              if (error) reject(error);
-              else resolve();
-            });
-          });
-        }
-        await new Promise<void>((resolve, reject) => {
-          execFile(kokoroPython, ["-m", "pip", "install", "kokoro", "soundfile", "numpy"], { timeout: 600_000 }, (error) => {
-            if (error) reject(error);
-            else resolve();
-          });
-        });
+        await installKokoroEngine(pythonPath, kokoroPython);
         setKokoroEngineInstalled(true);
         toast.style = Toast.Style.Success;
         toast.title = "Kokoro packages installed";
@@ -442,7 +425,7 @@ export default function Command() {
       ))}
       </List.Section>
 
-      <List.Section title="Piper Voices" subtitle="Fast, lightweight, CPU-only TTS">
+      {prefs.enablePiper && <List.Section title="Piper Voices" subtitle="Fast, lightweight, CPU-only TTS">
       {TTS_VOICES.map((v) => (
         <ModelListItem
           key={`piper-${v.id}`}
@@ -478,9 +461,7 @@ export default function Command() {
                   primaryAction: { title: "Uninstall", style: Alert.ActionStyle.Destructive },
                 });
                 if (uninstall) {
-                  await new Promise<void>((resolve) => {
-                    execFile(pythonPath, ["-m", "pip", "uninstall", "--break-system-packages", "-y", "piper-tts"], { timeout: 60_000 }, () => resolve());
-                  });
+                  await uninstallPiperEngine(pythonPath).catch(() => {});
                   setPiperEngineInstalled(false);
                 }
               }
@@ -488,9 +469,9 @@ export default function Command() {
           }}
         />
       ))}
-      </List.Section>
+      </List.Section>}
 
-      <List.Section title="Kokoro Voices" subtitle="High-quality neural TTS">
+      {prefs.enableKokoro && <List.Section title="Kokoro Voices" subtitle="High-quality neural TTS">
       {KOKORO_VOICES.map((v) => {
         const voiceDownloaded = kokoroVoiceStatuses[v.id] ?? false;
         const isDownloading = kokoroDownloader.downloadingId === `kokoro-${v.id}`;
@@ -530,9 +511,7 @@ export default function Command() {
                     rmSync(modelCacheDir(KOKORO_MODEL_ID), { recursive: true, force: true });
                     setKokoroBaseDownloaded(false);
                     if (kokoroEngineInstalled) {
-                      await new Promise<void>((resolve) => {
-                        execFile(kokoroPython, ["-m", "pip", "uninstall", "-y", "kokoro", "soundfile", "numpy"], { timeout: 60_000 }, () => resolve());
-                      });
+                      await uninstallKokoroEngine(kokoroPython).catch(() => {});
                       setKokoroEngineInstalled(false);
                     }
                   }
@@ -542,7 +521,7 @@ export default function Command() {
           />
         );
       })}
-      </List.Section>
+      </List.Section>}
 
       <List.Section title="System Voices" subtitle="macOS built-in voices for Read Aloud">
       {SYSTEM_VOICES.map((v) => (

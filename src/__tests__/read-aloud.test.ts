@@ -34,7 +34,7 @@ vi.mock("../models", () => ({
   ensureDefaultTtsVoice: vi.fn(async () => {}),
 }));
 
-import { speakText, isKokoroServerRunning } from "../read-aloud";
+import { speakText, isKokoroServerRunning, buildKokoroServerScript } from "../read-aloud";
 import { readFileSync, existsSync } from "fs";
 import { createConnection } from "net";
 import { spawn } from "child_process";
@@ -43,7 +43,7 @@ import { getActiveSystemVoice, getActiveKokoroVoice, getActiveTtsVoice, isTtsVoi
 import * as raycastApi from "@raycast/api";
 import { _setPrefs, _setSelectedText, _setClipboardText } from "@raycast/api";
 
-_setPrefs({ pythonPath: "/opt/homebrew/bin/python3", kokoroPythonPath: "", ttsEngine: "piper" });
+_setPrefs({ pythonPath: "/opt/homebrew/bin/python3", kokoroPythonPath: "" });
 
 const showHUDSpy = vi.spyOn(raycastApi, "showHUD");
 const updateMetadataSpy = vi.spyOn(raycastApi, "updateCommandMetadata");
@@ -233,5 +233,22 @@ describe("speakText voice selection", () => {
     expect(spawn).toHaveBeenCalled();
 
     vi.useRealTimers();
+  });
+});
+
+describe("buildKokoroServerScript", () => {
+  it("uses default idle timeout of 120", () => {
+    const script = buildKokoroServerScript();
+    expect(script).toContain("IDLE_TIMEOUT = 120");
+  });
+
+  it("uses custom idle timeout", () => {
+    const script = buildKokoroServerScript(300);
+    expect(script).toContain("IDLE_TIMEOUT = 300");
+  });
+
+  it("accepts zero to disable timeout", () => {
+    const script = buildKokoroServerScript(0);
+    expect(script).toContain("IDLE_TIMEOUT = 0");
   });
 });

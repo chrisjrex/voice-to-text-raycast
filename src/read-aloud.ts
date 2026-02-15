@@ -7,9 +7,9 @@ import { join } from "path";
 import { getActiveTtsVoice, getActiveKokoroVoice, getActiveSystemVoice, isTtsVoiceDownloaded, ttsVoicesDir, ensureDefaultTtsVoice } from "./models";
 
 interface Preferences {
-  ttsEngine: "none" | "piper" | "kokoro";
   pythonPath: string;
   kokoroPythonPath: string;
+  kokoroIdleTimeout: string;
 }
 
 const KOKORO_SOCK = `/tmp/kokoro_tts_${process.getuid?.() ?? 0}.sock`;
@@ -21,14 +21,14 @@ function resolveKokoroPython(prefs: Preferences): string {
   return raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
 }
 
-function buildKokoroServerScript(): string {
+function buildKokoroServerScript(idleTimeout = 120): string {
   return `
 import json, os, select, signal, socket, sys, time, numpy as np, soundfile as sf
 from kokoro import KPipeline
 
 SOCK_PATH = ${JSON.stringify(KOKORO_SOCK)}
 PID_PATH = ${JSON.stringify(KOKORO_PID)}
-IDLE_TIMEOUT = 120
+IDLE_TIMEOUT = ${idleTimeout}
 
 pipelines = {}
 
@@ -105,8 +105,8 @@ function isKokoroServerRunning(): Promise<boolean> {
 
 const KOKORO_LOG = join(environment.supportPath, "kokoro_server.log");
 
-async function startKokoroServer(pythonPath: string): Promise<void> {
-  writeFileSync(KOKORO_SERVER_SCRIPT, buildKokoroServerScript());
+async function startKokoroServer(pythonPath: string, idleTimeout = 120): Promise<void> {
+  writeFileSync(KOKORO_SERVER_SCRIPT, buildKokoroServerScript(idleTimeout));
   writeFileSync(KOKORO_LOG, "");
   const logFd = openSync(KOKORO_LOG, "a");
   const env = { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}` };
@@ -261,7 +261,8 @@ export async function speakText(text: string): Promise<void> {
     const kokoroPython = resolveKokoroPython(prefs);
     if (!await isKokoroServerRunning()) {
       await showHUD("Starting Kokoro server...");
-      await startKokoroServer(kokoroPython);
+      const idleTimeout = Math.max(0, parseInt(prefs.kokoroIdleTimeout, 10) || 120);
+      await startKokoroServer(kokoroPython, idleTimeout);
     }
     await speakWithKokoroServer(text, activeKokoro);
     return;

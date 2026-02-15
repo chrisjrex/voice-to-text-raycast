@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "voice-to-text",
   "title": "Voice-to-Text",
-  "description": "Local voice-to-text using MLX models (Whisper or Parakeet)",
+  "description": "Voice-to-text and Text-to-Speech with local models",
   "icon": "icon.png",
   "author": "rex",
   "license": "MIT",
@@ -44,66 +44,26 @@
       "mode": "no-view"
     },
     {
-      "name": "toggle-kokoro-server",
-      "title": "Toggle Kokoro Server",
-      "description": "Start or stop the persistent Kokoro TTS server",
-      "mode": "no-view"
+      "name": "tts-menu-bar",
+      "title": "TTS Status",
+      "description": "Shows TTS engine status and controls in the menu bar",
+      "mode": "menu-bar",
+      "interval": "1m"
     }
   ],
   "preferences": [
     {
-      "name": "ttsEngine",
+      "name": "aiModel",
       "type": "dropdown",
-      "title": "TTS Engine",
-      "description": "Read transcribed text aloud after dictation. Piper needs: pip install piper-tts. Kokoro needs: pip install kokoro",
+      "title": "Post-Processing Model",
+      "description": "AI model used for post-processing transcriptions. Requires Raycast AI (Pro).",
       "required": false,
-      "default": "none",
+      "default": "OpenAI_GPT-4o_mini",
       "data": [
-        { "title": "None (no playback)", "value": "none" },
-        { "title": "Piper (fast, CPU, CLI)", "value": "piper" },
-        { "title": "Kokoro (82M params, Python)", "value": "kokoro" }
+        { "title": "GPT-4o Mini (default)", "value": "OpenAI_GPT-4o_mini" },
+        { "title": "Gemini 3 Flash", "value": "Google_Gemini_3_Flash" },
+        { "title": "Claude 4.5 Haiku", "value": "Anthropic_Claude_4.5_Haiku" }
       ]
-    },
-    {
-      "name": "ttsVoice",
-      "type": "textfield",
-      "title": "TTS Voice / Model",
-      "description": "Piper: path to .onnx voice model file. Kokoro: voice name (e.g. af_heart)",
-      "required": false,
-      "default": ""
-    },
-    {
-      "name": "kokoroPythonPath",
-      "type": "textfield",
-      "title": "Kokoro Python Path",
-      "description": "Path to python3 with kokoro installed",
-      "default": "~/.local/lib-kokoro/venv/bin/python3",
-      "required": false
-    },
-    {
-      "name": "soxPath",
-      "type": "textfield",
-      "title": "Sox Path",
-      "description": "Path to sox binary",
-      "default": "/opt/homebrew/bin/sox",
-      "required": false
-    },
-    {
-      "name": "pythonPath",
-      "type": "textfield",
-      "title": "Python Path",
-      "description": "Path to python3 binary with mlx-whisper or parakeet-mlx installed",
-      "default": "/opt/homebrew/bin/python3",
-      "required": false
-    },
-    {
-      "name": "saveHistory",
-      "type": "checkbox",
-      "title": "Save Transcription History",
-      "description": "Save transcriptions to history for later review",
-      "default": true,
-      "required": false,
-      "label": "Enable"
     },
     {
       "name": "copyToClipboard",
@@ -124,11 +84,69 @@
       "label": "Paste to Active App"
     },
     {
+      "name": "saveHistory",
+      "type": "checkbox",
+      "title": "Save Transcription History",
+      "description": "Save transcriptions to history for later review",
+      "default": true,
+      "required": false,
+      "label": "Enable"
+    },
+    {
       "name": "silenceTimeout",
       "type": "textfield",
-      "title": "Silence Timeout (seconds)",
+      "title": "Transcription Silence Timeout (seconds)",
       "description": "Auto-stop recording after this many seconds of silence. Set to 0 to disable.",
       "default": "15",
+      "required": false
+    },
+    {
+      "name": "enablePiper",
+      "type": "checkbox",
+      "title": "TTS Engines",
+      "label": "Piper (fast, CPU, CLI)",
+      "description": "Enable Piper TTS engine. Requires: pip install piper-tts",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "enableKokoro",
+      "type": "checkbox",
+      "label": "Kokoro (82M params, Python)",
+      "description": "Enable Kokoro TTS engine. Requires: pip install kokoro",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "kokoroIdleTimeout",
+      "type": "textfield",
+      "title": "Kokoro Idle Timeout (seconds)",
+      "description": "Auto-shutdown the Kokoro server after this many seconds of inactivity. Set to 0 to disable.",
+      "default": "120",
+      "required": false
+    },
+    {
+      "name": "kokoroPythonPath",
+      "type": "textfield",
+      "title": "Kokoro Python Path",
+      "description": "Dedicated venv for Kokoro — kept separate to avoid dependency conflicts with STT/Piper packages",
+      "default": "~/.local/lib-kokoro/venv/bin/python3",
+      "required": false
+    },
+    {
+      "name": "pythonPath",
+      "type": "textfield",
+      "title": "Python Path [3.10+]",
+      "description": "Python with mlx-whisper or parakeet-mlx installed. Used for speech-to-text transcription and Piper TTS",
+      "default": "/opt/homebrew/bin/python3",
+      "required": false
+    },
+    {
+      "name": "soxPath",
+      "type": "textfield",
+      "title": "Sox Path [14.4+]",
+      "description": "Sox is used for audio recording during voice transcription",
+      "default": "/opt/homebrew/bin/sox",
       "required": false
     }
   ],
