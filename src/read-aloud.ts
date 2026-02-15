@@ -4,7 +4,7 @@ import { existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from "f
 import { createConnection } from "net";
 import { homedir } from "os";
 import { join } from "path";
-import { getActiveTtsVoice, getActiveKokoroVoice, getActiveSystemVoice, isTtsVoiceDownloaded, ttsVoicesDir } from "./models";
+import { getActiveTtsVoice, getActiveKokoroVoice, getActiveSystemVoice, isTtsVoiceDownloaded, ttsVoicesDir, ensureDefaultTtsVoice } from "./models";
 
 interface Preferences {
   ttsEngine: "none" | "piper" | "kokoro";
@@ -247,6 +247,7 @@ export async function speakText(text: string): Promise<void> {
 
   stopCurrentPlayback();
 
+  await ensureDefaultTtsVoice();
   const activeSystem = await getActiveSystemVoice();
   const activeKokoro = await getActiveKokoroVoice();
   const activePiperVoice = await getActiveTtsVoice();

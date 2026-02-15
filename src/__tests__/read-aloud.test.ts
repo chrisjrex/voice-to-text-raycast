@@ -32,6 +32,7 @@ vi.mock("../models", () => ({
   getActiveSystemVoice: vi.fn(async () => undefined),
   isTtsVoiceDownloaded: vi.fn(() => false),
   ttsVoicesDir: vi.fn(() => "/tmp/test-voices"),
+  ensureDefaultTtsVoice: vi.fn(async () => {}),
 }));
 
 import { resolveKokoroPython, buildKokoroServerScript, isKokoroServerRunning, speakText } from "../read-aloud";

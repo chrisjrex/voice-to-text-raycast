@@ -142,3 +142,32 @@ export async function getActiveSystemVoice(): Promise<string | undefined> {
 export async function setActiveSystemVoice(voiceId: string): Promise<void> {
   await LocalStorage.setItem(ACTIVE_SYSTEM_VOICE_KEY, voiceId);
 }
+
+export async function clearActiveSystemVoice(): Promise<void> {
+  await LocalStorage.removeItem(ACTIVE_SYSTEM_VOICE_KEY);
+}
+
+export async function clearActiveKokoroVoice(): Promise<void> {
+  await LocalStorage.removeItem(ACTIVE_KOKORO_VOICE_KEY);
+}
+
+export async function clearActiveTtsVoice(): Promise<void> {
+  await LocalStorage.removeItem(ACTIVE_TTS_VOICE_KEY);
+}
+
+const TTS_INITIALIZED_KEY = "tts_initialized";
+const DEFAULT_SYSTEM_VOICE = "Samantha";
+
+export async function ensureDefaultTtsVoice(): Promise<void> {
+  const initialized = await LocalStorage.getItem<boolean>(TTS_INITIALIZED_KEY);
+  if (initialized) return;
+
+  const system = await getActiveSystemVoice();
+  const kokoro = await getActiveKokoroVoice();
+  const piper = await getActiveTtsVoice();
+
+  if (!system && !kokoro && !piper) {
+    await setActiveSystemVoice(DEFAULT_SYSTEM_VOICE);
+  }
+  await LocalStorage.setItem(TTS_INITIALIZED_KEY, true);
+}
