@@ -12,6 +12,8 @@ type ExtensionPreferences = {
   "ttsEngine": "none" | "piper" | "kokoro",
   /** TTS Voice / Model - Piper: path to .onnx voice model file. Kokoro: voice name (e.g. af_heart) */
   "ttsVoice": string,
+  /** Kokoro Python Path - Path to python3 with kokoro installed */
+  "kokoroPythonPath": string,
   /** Sox Path - Path to sox binary */
   "soxPath": string,
   /** Python Path - Path to python3 binary with mlx-whisper or parakeet-mlx installed */
@@ -42,6 +44,8 @@ declare namespace Preferences {
   export type TranscriptionHistory = ExtensionPreferences & {}
   /** Preferences accessible in the `read-aloud` command */
   export type ReadAloud = ExtensionPreferences & {}
+  /** Preferences accessible in the `toggle-kokoro-server` command */
+  export type ToggleKokoroServer = ExtensionPreferences & {}
 }
 
 declare namespace Arguments {
@@ -57,5 +61,7 @@ declare namespace Arguments {
   export type TranscriptionHistory = {}
   /** Arguments passed to the `read-aloud` command */
   export type ReadAloud = {}
+  /** Arguments passed to the `toggle-kokoro-server` command */
+  export type ToggleKokoroServer = {}
 }
 

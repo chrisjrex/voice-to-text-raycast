@@ -1,6 +1,7 @@
-import { Action, ActionPanel, Alert, Color, confirmAlert, Icon, List } from "@raycast/api";
+import { Action, ActionPanel, Alert, Color, confirmAlert, Icon, List, showHUD } from "@raycast/api";
 import { useState } from "react";
 import { HistoryEntry, loadHistory, saveHistory } from "./history";
+import { speakText } from "./read-aloud";
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
@@ -66,6 +67,22 @@ export default function TranscriptionHistory() {
                 <ActionPanel.Section title="Transcription">
                   <Action.CopyToClipboard title="Copy Text" content={entry.text} />
                   <Action.Paste title="Paste Text" content={entry.text} shortcut={{ modifiers: ["cmd"], key: "enter" }} />
+                  <Action
+                    title="Read Aloud"
+                    icon={Icon.SpeakerOn}
+                    shortcut={{ modifiers: ["cmd", "shift"], key: "s" }}
+                    onAction={async () => {
+                      try {
+                        await showHUD("Speaking...");
+                        await speakText(entry.text);
+                        const preview = entry.text.length > 50 ? entry.text.slice(0, 50) + "..." : entry.text;
+                        await showHUD(`🔊 ${preview}`);
+                      } catch (err: unknown) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        await showHUD(`TTS failed: ${msg.slice(0, 80)}`);
+                      }
+                    }}
+                  />
                 </ActionPanel.Section>
                 <ActionPanel.Section title="Manage History">
                   <Action

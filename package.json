@@ -42,6 +42,12 @@
       "title": "Read Aloud",
       "description": "Read clipboard text aloud using Piper or Kokoro TTS",
       "mode": "no-view"
+    },
+    {
+      "name": "toggle-kokoro-server",
+      "title": "Toggle Kokoro Server",
+      "description": "Start or stop the persistent Kokoro TTS server",
+      "mode": "no-view"
     }
   ],
   "preferences": [
@@ -65,6 +71,14 @@
       "description": "Piper: path to .onnx voice model file. Kokoro: voice name (e.g. af_heart)",
       "required": false,
       "default": ""
+    },
+    {
+      "name": "kokoroPythonPath",
+      "type": "textfield",
+      "title": "Kokoro Python Path",
+      "description": "Path to python3 with kokoro installed",
+      "default": "~/.local/lib-kokoro/venv/bin/python3",
+      "required": false
     },
     {
       "name": "soxPath",

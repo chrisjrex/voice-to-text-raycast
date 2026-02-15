@@ -1,32 +1,15 @@
 import { Clipboard, environment, getPreferenceValues, getSelectedText, showHUD, updateCommandMetadata } from "@raycast/api";
-import { execFile, spawn } from "child_process";
+import { spawn } from "child_process";
 import { existsSync, openSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { createConnection } from "net";
 import { homedir } from "os";
 import { join } from "path";
-import { promisify } from "util";
-import { getActiveTtsVoice, getActiveKokoroVoice, isTtsVoiceDownloaded, ttsVoicesDir } from "./models";
-
-const execFileAsync = promisify(execFile);
+import { getActiveTtsVoice, getActiveKokoroVoice, getActiveSystemVoice, isTtsVoiceDownloaded, ttsVoicesDir } from "./models";
 
 interface Preferences {
   ttsEngine: "none" | "piper" | "kokoro";
   pythonPath: string;
   kokoroPythonPath: string;
-  kokoroServerMode: boolean;
-}
-
-function buildKokoroScript(text: string, voice: string, outputPath: string): string {
-  const escaped = text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
-  const v = voice || "af_heart";
-  return [
-    "from kokoro import KPipeline",
-    "import soundfile as sf",
-    "import numpy as np",
-    `pipeline = KPipeline(lang_code="${v[0]}")`,
-    `chunks = [audio for _, _, audio in pipeline("${escaped}", voice="${v}")]`,
-    `sf.write("${outputPath}", np.concatenate(chunks), 24000)`,
-  ].join("\n") + "\n";
 }
 
 const KOKORO_SOCK = `/tmp/kokoro_tts_${process.getuid()}.sock`;
@@ -40,11 +23,12 @@ function resolveKokoroPython(prefs: Preferences): string {
 
 function buildKokoroServerScript(): string {
   return `
-import json, os, signal, socket, sys, numpy as np, soundfile as sf
+import json, os, select, signal, socket, sys, time, numpy as np, soundfile as sf
 from kokoro import KPipeline
 
 SOCK_PATH = ${JSON.stringify(KOKORO_SOCK)}
 PID_PATH = ${JSON.stringify(KOKORO_PID)}
+IDLE_TIMEOUT = 120
 
 pipelines = {}
 
@@ -93,12 +77,19 @@ sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 sock.bind(SOCK_PATH)
 sock.listen(1)
 
+last_activity = time.monotonic()
 while True:
+    ready, _, _ = select.select([sock], [], [], 10)
+    if not ready:
+        if time.monotonic() - last_activity >= IDLE_TIMEOUT:
+            cleanup()
+        continue
     conn, _ = sock.accept()
     try:
         handle_client(conn)
     finally:
         conn.close()
+    last_activity = time.monotonic()
 `.trimStart();
 }
 
@@ -236,24 +227,54 @@ async function speakWithPiper(text: string, pythonPath: string, voiceId: string)
   startPlayback(outputPath);
 }
 
-async function speakWithKokoro(text: string, pythonPath: string, voice: string): Promise<void> {
-  const outputPath = join(environment.supportPath, `tts-${Date.now()}.wav`);
-  const scriptPath = join(environment.supportPath, "tts_kokoro.py");
+function speakWithSay(text: string, voice: string): void {
+  stopCurrentPlayback();
+  const child = spawn("say", ["-v", voice, text], {
+    detached: true,
+    stdio: "ignore",
+  });
+  if (child.pid) {
+    writeFileSync(PLAYBACK_PID, String(child.pid));
+  }
+  child.on("exit", () => {
+    try { unlinkSync(PLAYBACK_PID); } catch {}
+  });
+  child.unref();
+}
 
-  writeFileSync(scriptPath, buildKokoroScript(text, voice, outputPath));
+export async function speakText(text: string): Promise<void> {
+  const prefs = getPreferenceValues<Preferences>();
 
-  try {
-    const env = { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}` };
-    await execFileAsync(pythonPath, [scriptPath], { timeout: 120_000, env });
-  } finally {
-    try { unlinkSync(scriptPath); } catch {}
+  stopCurrentPlayback();
+
+  const activeSystem = await getActiveSystemVoice();
+  const activeKokoro = await getActiveKokoroVoice();
+  const activePiperVoice = await getActiveTtsVoice();
+
+  if (activeSystem) {
+    await speakWithSay(text, activeSystem);
+    return;
   }
 
-  startPlayback(outputPath);
+  if (activeKokoro) {
+    const kokoroPython = resolveKokoroPython(prefs);
+    if (!await isKokoroServerRunning()) {
+      await showHUD("Starting Kokoro server...");
+      await startKokoroServer(kokoroPython);
+    }
+    await speakWithKokoroServer(text, activeKokoro);
+    return;
+  }
+
+  if (activePiperVoice && isTtsVoiceDownloaded(activePiperVoice)) {
+    await speakWithPiper(text, prefs.pythonPath, activePiperVoice);
+    return;
+  }
+
+  throw new Error("No TTS voice set. Use Manage Models to select one.");
 }
 
 export default async function Command() {
-  const prefs = getPreferenceValues<Preferences>();
   const playing = isPlaying();
 
   let selectedText: string | undefined;
@@ -269,8 +290,6 @@ export default async function Command() {
     return;
   }
 
-  stopCurrentPlayback();
-
   const text = selectedText ?? (await Clipboard.readText())?.trim();
 
   if (!text) {
@@ -279,58 +298,9 @@ export default async function Command() {
     return;
   }
 
-  const activePiperVoice = await getActiveTtsVoice();
-  const activeKokoro = await getActiveKokoroVoice();
-  let engine = prefs.ttsEngine;
-  let voiceId = "";
-
-  if (activeKokoro) {
-    engine = "kokoro";
-    voiceId = activeKokoro;
-  } else if (activePiperVoice && isTtsVoiceDownloaded(activePiperVoice)) {
-    engine = "piper";
-    voiceId = activePiperVoice;
-  }
-
-  if (engine === "none") {
-    await showHUD("No TTS voice set. Use Manage Models to select one.");
-    return;
-  }
-
-  if (engine === "piper" && !voiceId) {
-    await showHUD("No Piper voice set. Use Manage Models to download one.");
-    return;
-  }
-
-  const kokoroPython = resolveKokoroPython(prefs);
-
-  if (engine === "kokoro" && !prefs.kokoroServerMode) {
-    try {
-      await execFileAsync(kokoroPython, ["-c", "import kokoro"]);
-    } catch {
-      await showHUD("kokoro not found. Check Kokoro Python Path in preferences.");
-      return;
-    }
-  }
-
   try {
-    if (engine === "piper") {
-      await showHUD("Speaking...");
-      await speakWithPiper(text, prefs.pythonPath, voiceId);
-    } else if (prefs.kokoroServerMode) {
-      if (!await isKokoroServerRunning()) {
-        await showHUD("Starting Kokoro server...");
-        await startKokoroServer(kokoroPython);
-      }
-      await showHUD("Speaking...");
-      await speakWithKokoroServer(text, voiceId);
-    } else {
-      await showHUD("Speaking...");
-      await speakWithKokoro(text, kokoroPython, voiceId);
-    }
-    await updateCommandMetadata({ subtitle: "Speaking" });
-    const preview = text.length > 50 ? text.slice(0, 50) + "..." : text;
-    await showHUD(`🔊 ${preview}`);
+    await speakText(text);
+    await showHUD("Speaking...");
   } catch (err: unknown) {
     await updateCommandMetadata({ subtitle: "" });
     const msg = err instanceof Error ? err.message : String(err);
