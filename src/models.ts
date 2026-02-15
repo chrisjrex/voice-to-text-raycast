@@ -1,8 +1,8 @@
 import { LocalStorage, environment } from "@raycast/api";
 import { execFile } from "child_process";
-import { existsSync, readlinkSync, readdirSync, unlinkSync } from "fs";
+import { existsSync, readlinkSync, readdirSync, rmSync, unlinkSync } from "fs";
 import { homedir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 
 const ACTIVE_MODEL_KEY = "active_model";
 const ACTIVE_TTS_VOICE_KEY = "active_tts_voice";
@@ -191,6 +191,41 @@ export async function clearActiveKokoroVoice(): Promise<void> {
 
 export async function clearActiveTtsVoice(): Promise<void> {
   await LocalStorage.removeItem(ACTIVE_TTS_VOICE_KEY);
+}
+
+// --- Engine install/uninstall helpers ---
+
+function execAsync(cmd: string, args: string[], timeout = 300_000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { timeout }, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+export async function installPiperEngine(pythonPath: string): Promise<void> {
+  await execAsync(pythonPath, ["-m", "pip", "install", "--break-system-packages", "piper-tts"]);
+}
+
+export async function uninstallPiperEngine(pythonPath: string): Promise<void> {
+  rmSync(ttsVoicesDir(), { recursive: true, force: true });
+  await execAsync(pythonPath, ["-m", "pip", "uninstall", "--break-system-packages", "-y", "piper-tts"], 60_000);
+}
+
+export async function installKokoroEngine(pythonPath: string, kokoroPython: string): Promise<void> {
+  if (!existsSync(kokoroPython)) {
+    const venvDir = dirname(dirname(kokoroPython));
+    await execAsync(pythonPath, ["-m", "venv", venvDir], 60_000);
+  }
+  await execAsync(kokoroPython, ["-m", "pip", "install", "kokoro", "soundfile", "numpy"], 600_000);
+}
+
+export async function uninstallKokoroEngine(kokoroPython: string): Promise<void> {
+  rmSync(modelCacheDir(KOKORO_MODEL_ID), { recursive: true, force: true });
+  if (existsSync(kokoroPython)) {
+    await execAsync(kokoroPython, ["-m", "pip", "uninstall", "-y", "kokoro", "soundfile", "numpy"], 60_000);
+  }
 }
 
 const TTS_INITIALIZED_KEY = "tts_initialized";

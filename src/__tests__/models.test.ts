@@ -18,13 +18,22 @@ import {
   getActiveSystemVoice,
   setActiveSystemVoice,
   clearActiveSystemVoice,
+  installPiperEngine,
+  uninstallPiperEngine,
+  installKokoroEngine,
+  uninstallKokoroEngine,
 } from "../models";
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync, rmSync } from "fs";
+import { execFile } from "child_process";
 import { LocalStorage } from "@raycast/api";
 
 vi.mock("fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("fs")>();
-  return { ...actual, existsSync: vi.fn(), readdirSync: vi.fn() };
+  return { ...actual, existsSync: vi.fn(), readdirSync: vi.fn(), rmSync: vi.fn() };
+});
+vi.mock("child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("child_process")>();
+  return { ...actual, execFile: vi.fn() };
 });
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -202,5 +211,117 @@ describe("clear functions", () => {
     await setActiveSystemVoice("Samantha");
     await clearActiveSystemVoice();
     expect(await getActiveSystemVoice()).toBeUndefined();
+  });
+});
+
+// Helper to make execFile invoke its callback successfully
+function mockExecFileSuccess() {
+  vi.mocked(execFile).mockImplementation((_cmd, _args, _opts, cb) => {
+    if (typeof cb === "function") (cb as (err: Error | null) => void)(null);
+    return {} as ReturnType<typeof execFile>;
+  });
+}
+
+function mockExecFileFailure(msg: string) {
+  vi.mocked(execFile).mockImplementation((_cmd, _args, _opts, cb) => {
+    if (typeof cb === "function") (cb as (err: Error | null) => void)(new Error(msg));
+    return {} as ReturnType<typeof execFile>;
+  });
+}
+
+describe("installPiperEngine", () => {
+  beforeEach(() => { vi.resetAllMocks(); });
+
+  it("calls pip install piper-tts", async () => {
+    mockExecFileSuccess();
+    await installPiperEngine("/usr/bin/python3");
+    expect(execFile).toHaveBeenCalledWith(
+      "/usr/bin/python3",
+      ["-m", "pip", "install", "--break-system-packages", "piper-tts"],
+      expect.objectContaining({ timeout: 300_000 }),
+      expect.any(Function),
+    );
+  });
+
+  it("rejects on failure", async () => {
+    mockExecFileFailure("pip error");
+    await expect(installPiperEngine("/usr/bin/python3")).rejects.toThrow("pip error");
+  });
+});
+
+describe("uninstallPiperEngine", () => {
+  beforeEach(() => { vi.resetAllMocks(); });
+
+  it("removes voice directory and calls pip uninstall", async () => {
+    mockExecFileSuccess();
+    await uninstallPiperEngine("/usr/bin/python3");
+    expect(rmSync).toHaveBeenCalledWith(expect.stringContaining("tts-voices"), { recursive: true, force: true });
+    expect(execFile).toHaveBeenCalledWith(
+      "/usr/bin/python3",
+      ["-m", "pip", "uninstall", "--break-system-packages", "-y", "piper-tts"],
+      expect.objectContaining({ timeout: 60_000 }),
+      expect.any(Function),
+    );
+  });
+});
+
+describe("installKokoroEngine", () => {
+  beforeEach(() => { vi.resetAllMocks(); });
+
+  it("creates venv when kokoroPython does not exist, then pip installs", async () => {
+    mockExistsSync.mockReturnValue(false);
+    const calls: string[] = [];
+    vi.mocked(execFile).mockImplementation((cmd, _args, _opts, cb) => {
+      calls.push(cmd as string);
+      if (typeof cb === "function") (cb as (err: Error | null) => void)(null);
+      return {} as ReturnType<typeof execFile>;
+    });
+
+    await installKokoroEngine("/usr/bin/python3", "/tmp/venv/bin/python3");
+
+    expect(calls).toEqual(["/usr/bin/python3", "/tmp/venv/bin/python3"]);
+  });
+
+  it("skips venv creation when kokoroPython exists", async () => {
+    mockExistsSync.mockReturnValue(true);
+    mockExecFileSuccess();
+
+    await installKokoroEngine("/usr/bin/python3", "/tmp/venv/bin/python3");
+
+    expect(execFile).toHaveBeenCalledTimes(1);
+    expect(execFile).toHaveBeenCalledWith(
+      "/tmp/venv/bin/python3",
+      ["-m", "pip", "install", "kokoro", "soundfile", "numpy"],
+      expect.anything(),
+      expect.any(Function),
+    );
+  });
+});
+
+describe("uninstallKokoroEngine", () => {
+  beforeEach(() => { vi.resetAllMocks(); });
+
+  it("removes model cache and pip uninstalls when python exists", async () => {
+    mockExistsSync.mockReturnValue(true);
+    mockExecFileSuccess();
+
+    await uninstallKokoroEngine("/tmp/venv/bin/python3");
+
+    expect(rmSync).toHaveBeenCalledWith(expect.stringContaining("models--hexgrad--Kokoro-82M"), { recursive: true, force: true });
+    expect(execFile).toHaveBeenCalledWith(
+      "/tmp/venv/bin/python3",
+      ["-m", "pip", "uninstall", "-y", "kokoro", "soundfile", "numpy"],
+      expect.anything(),
+      expect.any(Function),
+    );
+  });
+
+  it("skips pip uninstall when python does not exist", async () => {
+    mockExistsSync.mockReturnValue(false);
+
+    await uninstallKokoroEngine("/tmp/venv/bin/python3");
+
+    expect(rmSync).toHaveBeenCalled();
+    expect(execFile).not.toHaveBeenCalled();
   });
 });
