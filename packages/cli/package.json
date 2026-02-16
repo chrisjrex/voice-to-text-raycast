@@ -14,8 +14,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "lint": "eslint src/**/*.ts",
-    "prepare": "node scripts/check-runtime.js"
+    "lint": "eslint src/**/*.ts"
   },
   "keywords": [
     "voice",
