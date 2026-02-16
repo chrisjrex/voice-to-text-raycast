@@ -1,2 +1,6 @@
 node_modules/
 .venv/
+dist/
+*.tgz
+build/
+.DS_Store

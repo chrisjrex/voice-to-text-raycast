@@ -6,24 +6,57 @@ Local voice-to-text and text-to-speech for Raycast. Everything runs on-device �
 
 ## Installation
 
-> **Installing from source?** See [INSTALL.md](INSTALL.md) for developer setup instructions.
+### Quick Install (Recommended)
+
+Zero-setup installation with bundled runtime:
 
 ```bash
-# Recording (required for dictation)
-brew install sox
-
-# Speech-to-text — pick one or both:
-pip3 install mlx-whisper    # multilingual
-pip3 install parakeet-mlx   # English-only, generally faster
+npm install -g @vtt/cli
 ```
 
-Then in Raycast:
+Or via Homebrew:
+```bash
+brew tap chrisjrex/vtt
+brew install vtt
+```
 
-1. Open **Manage Models**
-2. Download at least one STT model and set it as active
-3. *(Optional)* Download a TTS voice and set it as active, or select a macOS system voice
+That's it! Everything is included (Python 3.11, all packages, sox).
 
-Run **Transcribe** to dictate, **Read Aloud** to speak text.
+### Lite Install (Advanced)
+
+If you prefer managing dependencies yourself:
+
+```bash
+# Install prerequisites
+brew install sox python@3.11
+pip3 install mlx-whisper  # or parakeet-mlx
+
+# Install VTT
+npm install -g @vtt/cli-lite
+```
+
+See [INSTALL.md](INSTALL.md) for detailed installation options.
+
+---
+
+## Quick Start
+
+1. **Check installation:**
+   ```bash
+   vtt doctor
+   ```
+
+2. **Download a model and voice:**
+   ```bash
+   vtt models download whisper-tiny
+   vtt voices download Heart
+   ```
+
+3. **Start using:**
+   ```bash
+   vtt transcribe    # Record and transcribe
+   vtt speak "Hello" # Text to speech
+   ```
 
 ---
 
@@ -135,12 +168,29 @@ Voices are downloaded individually (~60MB each). The first download also install
 
 These apply across all commands (Raycast Settings > Extensions > Voice-to-Text):
 
+### Core Settings
+
 | Setting | Default | Description |
 |---|---|---|
 | Post-Processing Model | GPT-4o Mini | AI model for post-processing transcriptions |
-| Python Path | `/opt/homebrew/bin/python3` | Python 3.10+ with mlx-whisper or parakeet-mlx |
-| Kokoro Python Path | `~/.local/lib-kokoro/venv/bin/python3` | Python 3.10–3.12 for Kokoro (separate venv) |
-| Sox Path | `/opt/homebrew/bin/sox` | Path to sox binary for audio recording |
+
+### Runtime Settings (Optional)
+
+**When using `@vtt/cli` (bundled):** These settings are automatically configured. You only need to change them if you want to use a custom Python environment.
+
+**When using `@vtt/cli-lite`:** These settings must point to your system Python installation.
+
+| Setting | Default | Description |
+|---|---|---|
+| Python Path | Auto-detected | Python 3.10+ with mlx-whisper or parakeet-mlx |
+| Kokoro Python Path | Auto-detected | Python 3.10–3.12 for Kokoro (separate venv recommended) |
+| Sox Path | Auto-detected | Path to sox binary for audio recording |
+
+**Environment Variables:** You can also set these via environment variables (takes precedence over settings):
+- `VTT_PYTHON_PATH`
+- `VTT_KOKORO_PYTHON_PATH`
+- `VTT_SOX_PATH`
+- `VTT_DATA_DIR`
 
 ---
 
