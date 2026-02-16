@@ -26,7 +26,7 @@ const DEFAULT_CONFIG: Config = {
   dataDir: `${homedir()}/.local/share/vtt`,
   kokoroSocket: `/tmp/kokoro_tts_${process.getuid?.() ?? 0}.sock`,
   kokoroIdleTimeout: 120,
-  defaultSTTModel: "whisper-tiny",
+  defaultSTTModel: "", // No default - model must be specified or set via VTT_DEFAULT_STT_MODEL
   defaultTTSVoice: "Samantha",
   logLevel: "info"
 };

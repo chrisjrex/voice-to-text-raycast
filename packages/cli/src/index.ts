@@ -475,7 +475,7 @@ Run 'vtt transcribe <command> --help' for more information on a command.`);
 transcribeCmd
   .command("start")
   .description("Start background transcription (daemon mode)")
-  .option("-m, --model <alias>", "Model alias", process.env.VTT_DEFAULT_STT_MODEL || "whisper-tiny")
+  .option("-m, --model <alias>", "Model alias (e.g., whisper-tiny, parakeet-110m)")
   .option("--silence-timeout <sec>", "Auto-stop after N seconds of silence (0 = disabled)", "0")
   .option("--silence-threshold <amp>", "Amplitude threshold for silence detection", "0.02")
   .option("--max-duration <sec>", "Maximum recording duration (0 = unlimited)", "0")
@@ -485,6 +485,19 @@ transcribeCmd
     const outputPath = options.output || join(config.dataDir, "transcription.json");
     const { spawn } = require("child_process");
     const { writeFileSync, existsSync, readFileSync } = require("fs");
+    
+    // Check if model is provided or if VTT_DEFAULT_STT_MODEL is set
+    let modelAlias = options.model || config.defaultSTTModel || process.env.VTT_DEFAULT_STT_MODEL;
+    if (!modelAlias) {
+      console.error("Error: No model specified.");
+      console.error("Either:");
+      console.error("  1. Use -m/--model flag: vtt transcribe start -m whisper-tiny");
+      console.error("  2. Set VTT_DEFAULT_STT_MODEL environment variable");
+      console.error("");
+      console.error("Available models:");
+      console.error("  vtt models list");
+      process.exit(1);
+    }
     
     // Check if already running
     const pidPath = join(config.dataDir, "transcribe_daemon.pid");
@@ -500,13 +513,13 @@ transcribeCmd
       }
     }
     
-    const model = getModelByAlias(options.model);
+    const model = getModelByAlias(modelAlias);
     if (!model) {
-      console.error(`Error: Unknown model "${options.model}"`);
+      console.error(`Error: Unknown model "${modelAlias}"`);
       process.exit(ExitCodes.UNKNOWN_MODEL);
     }
     
-    console.log(`Starting transcription daemon with model: ${options.model}`);
+    console.log(`Starting transcription daemon with model: ${modelAlias}`);
     
     // Create daemon script
     const daemonScript = `
@@ -699,7 +712,7 @@ transcribeCmd
 transcribeCmd
   .command("record")
   .description("Record and transcribe (single session)")
-  .option("-m, --model <alias>", "Model alias (e.g., whisper-tiny, parakeet-110m)", process.env.VTT_DEFAULT_STT_MODEL || "whisper-tiny")
+  .option("-m, --model <alias>", "Model alias (e.g., whisper-tiny, parakeet-110m)")
   .option("-o, --output <path>", "Save transcription to file (instead of stdout)")
   .option("-f, --format <type>", "Output format: json, text, raw (default: json)", "json")
   .option("-i, --input <path>", "Transcribe existing audio file instead of recording")
@@ -711,16 +724,29 @@ transcribeCmd
     const config = loadConfig();
     const quiet = options.quiet || false;
     
+    // Check if model is provided or if VTT_DEFAULT_STT_MODEL is set
+    let modelAlias = options.model || config.defaultSTTModel || process.env.VTT_DEFAULT_STT_MODEL;
+    if (!modelAlias) {
+      console.error("Error: No model specified.");
+      console.error("Either:");
+      console.error("  1. Use -m/--model flag: vtt transcribe -m whisper-tiny");
+      console.error("  2. Set VTT_DEFAULT_STT_MODEL environment variable");
+      console.error("");
+      console.error("Available models:");
+      console.error("  vtt models list");
+      process.exit(1);
+    }
+    
     // Resolve model
-    const model = getModelByAlias(options.model);
+    const model = getModelByAlias(modelAlias);
     if (!model) {
-      console.error(`Error: Unknown model "${options.model}"`);
+      console.error(`Error: Unknown model "${modelAlias}"`);
       console.error(`Run 'vtt models list' to see available models.`);
       process.exit(ExitCodes.UNKNOWN_MODEL);
     }
     
     if (!quiet) {
-      log(config, "info", `Using model: ${options.model} (${model.provider})`);
+      log(config, "info", `Using model: ${modelAlias} (${model.provider})`);
     }
     
     // Check dependencies
