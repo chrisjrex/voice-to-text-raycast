@@ -5,7 +5,7 @@
  */
 
 import { Command } from "commander";
-import { readFileSync, existsSync, statSync, unlinkSync } from "fs";
+import { readFileSync, existsSync, statSync, unlinkSync, readdirSync, rmdirSync } from "fs";
 import { loadConfig, log, getRuntimeInfo } from "../../core/dist/index.js";
 import { getVoiceByAlias, getVoiceByAliasAndEngine, listAllVoices, getModelByAlias, listAllModels } from "../../core/dist/index.js";
 import { getTTSEngine, SystemTTSEngine } from "../../core/dist/index.js";
@@ -20,6 +20,44 @@ import {
   ExitCodes
 } from "../../core/dist/index.js";
 import { join } from "path";
+
+function cleanupRecordingsDir(dirPath: string): void {
+  try {
+    if (!existsSync(dirPath)) return;
+    const files = readdirSync(dirPath);
+    for (const file of files) {
+      const filePath = join(dirPath, file);
+      try {
+        const stat = statSync(filePath);
+        if (stat.isFile()) {
+          unlinkSync(filePath);
+        }
+      } catch {
+        // Ignore individual file errors
+      }
+    }
+    // Try to remove empty directory
+    try {
+      rmdirSync(dirPath);
+    } catch {
+      // Ignore if not empty
+    }
+  } catch {
+    // Ignore directory errors
+  }
+}
+
+function shouldAutoCleanRecordings(): boolean {
+  return process.env.VTT_AUTO_CLEAN_RECORDINGS !== "false";
+}
+
+function getTtsRecordingsPath(config: { dataDir: string }): string {
+  return process.env.VTT_TTS_RECORDINGS_PATH || join(config.dataDir, "tts", "recordings");
+}
+
+function getSttRecordingsPath(config: { dataDir: string }): string {
+  return process.env.VTT_STT_RECORDINGS_PATH || join(config.dataDir, "stt", "recordings");
+}
 
 const program = new Command();
 
@@ -132,7 +170,8 @@ program
       }
       
       // Generate audio
-      const outputPath = options.output || join(config.dataDir, "tts", "tmp", `${Date.now()}.wav`);
+      const ttsRecordingsPath = getTtsRecordingsPath(config);
+      const outputPath = options.output || join(ttsRecordingsPath, `${Date.now()}.wav`);
       
       if (voice.provider === "system") {
         // System voices use native speed control
@@ -151,13 +190,20 @@ program
         if (!quiet) {
           log(config, "info", "Playing audio...");
         }
+        const recordingsDir = ttsRecordingsPath;
         const playback = playAudio(outputPath, config, () => {
+          if (shouldAutoCleanRecordings()) {
+            cleanupRecordingsDir(recordingsDir);
+          }
           process.exit(0);
         });
         
         // Handle Ctrl+C
         process.on("SIGINT", () => {
           playback.stop();
+          if (shouldAutoCleanRecordings()) {
+            cleanupRecordingsDir(recordingsDir);
+          }
           process.exit(0);
         });
       }
@@ -913,7 +959,8 @@ transcribeCmd
       }
     } else {
       // Record audio
-      audioPath = join(config.dataDir, "stt", "recordings", `recording-${Date.now()}.wav`);
+      const sttRecordingsPath = getSttRecordingsPath(config);
+      audioPath = join(sttRecordingsPath, `recording-${Date.now()}.wav`);
       
       const silenceTimeout = parseInt(options.silenceTimeout, 10) || 0;
       const silenceThreshold = parseFloat(options.silenceThreshold) || 0.02;
@@ -972,6 +1019,11 @@ transcribeCmd
           unlinkSync(audioPath);
         } catch {
           // Ignore cleanup error
+        }
+        // Clean up recordings directory
+        if (shouldAutoCleanRecordings()) {
+          const recordingsDir = getSttRecordingsPath(config);
+          cleanupRecordingsDir(recordingsDir);
         }
       }
       
@@ -1042,6 +1094,11 @@ transcribeCmd
           unlinkSync(audioPath);
         } catch {
           // Ignore cleanup error
+        }
+        // Clean up recordings directory on error
+        if (shouldAutoCleanRecordings()) {
+          const recordingsDir = getSttRecordingsPath(config);
+          cleanupRecordingsDir(recordingsDir);
         }
       }
       
@@ -1476,9 +1533,15 @@ program
     if (process.env.VTT_KOKORO_PYTHON_PATH) configuredEnvVars.VTT_KOKORO_PYTHON_PATH = process.env.VTT_KOKORO_PYTHON_PATH;
     if (process.env.VTT_SOX_PATH) configuredEnvVars.VTT_SOX_PATH = process.env.VTT_SOX_PATH;
     if (process.env.VTT_DATA_DIR) configuredEnvVars.VTT_DATA_DIR = process.env.VTT_DATA_DIR;
+    if (process.env.VTT_KOKORO_SOCKET) configuredEnvVars.VTT_KOKORO_SOCKET = process.env.VTT_KOKORO_SOCKET;
+    if (process.env.VTT_KOKORO_IDLE_TIMEOUT) configuredEnvVars.VTT_KOKORO_IDLE_TIMEOUT = process.env.VTT_KOKORO_IDLE_TIMEOUT;
     if (process.env.VTT_DEFAULT_STT_MODEL) configuredEnvVars.VTT_DEFAULT_STT_MODEL = process.env.VTT_DEFAULT_STT_MODEL;
     if (process.env.VTT_DEFAULT_TTS_ENGINE) configuredEnvVars.VTT_DEFAULT_TTS_ENGINE = process.env.VTT_DEFAULT_TTS_ENGINE;
     if (process.env.VTT_DEFAULT_TTS_VOICE) configuredEnvVars.VTT_DEFAULT_TTS_VOICE = process.env.VTT_DEFAULT_TTS_VOICE;
+    if (process.env.VTT_LOG_LEVEL) configuredEnvVars.VTT_LOG_LEVEL = process.env.VTT_LOG_LEVEL;
+    if (process.env.VTT_AUTO_CLEAN_RECORDINGS) configuredEnvVars.VTT_AUTO_CLEAN_RECORDINGS = process.env.VTT_AUTO_CLEAN_RECORDINGS;
+    if (process.env.VTT_TTS_RECORDINGS_PATH) configuredEnvVars.VTT_TTS_RECORDINGS_PATH = process.env.VTT_TTS_RECORDINGS_PATH;
+    if (process.env.VTT_STT_RECORDINGS_PATH) configuredEnvVars.VTT_STT_RECORDINGS_PATH = process.env.VTT_STT_RECORDINGS_PATH;
     if (process.env.VTT_ASK_PERMISSION) configuredEnvVars.VTT_ASK_PERMISSION = process.env.VTT_ASK_PERMISSION;
     
     // Check dependencies
@@ -1624,52 +1687,86 @@ program
       const cleanReport = JSON.parse(JSON.stringify(report));
       console.log(JSON.stringify(cleanReport, null, 2));
     } else {
-      console.log("\nVTT Doctor - System Health Check");
-      console.log("══════════════════════════════════════════════════");
+      // Use Python script for formatted tables
+      const { execSync } = require("child_process");
+      const scriptPath = join(__dirname, "..", "assets", "format-doctor-tables.js");
+      const fallbackScriptPath = join(__dirname, "..", "assets", "format-doctor-tables.py");
       
-      // Runtime
+      // Runtime display helpers
       const runtimeTypeDisplay = {
         bundled: "✓ Bundled (self-contained)",
         system: "System",
         custom: "Custom (env override)"
       };
-      console.log(`\nRuntime: ${runtimeTypeDisplay[runtimeInfo.type]}`);
-      console.log(`  Python: ${config.pythonPath}`);
-      if (runtimeInfo.type === "custom" || (runtimeInfo.type === "system" && config.soxPath !== "/opt/homebrew/bin/sox")) {
-        console.log(`  Sox: ${config.soxPath}`);
+      
+      // Print header
+      console.log("\nVTT Doctor - System Health Check");
+      console.log("══════════════════════════════════════════════════");
+      
+      let tablesOutput = "";
+      
+      try {
+        const scriptToUse = existsSync(scriptPath) ? scriptPath : fallbackScriptPath;
+        tablesOutput = execSync(`"${config.pythonPath}" "${scriptToUse}"`, {
+          input: JSON.stringify(report),
+          encoding: "utf-8",
+          timeout: 30000
+        }).trimStart();
+      } catch {
+        // Fallback to manual output - build the tables manually
+        const runtimeTypeValue = runtimeInfo.type === "system" 
+          ? runtimeTypeDisplay[runtimeInfo.type]
+          : "✓ " + runtimeTypeDisplay[runtimeInfo.type];
+        
+        const runtimeTable = [
+          "Runtime:",
+          `  Type     ${runtimeTypeValue}`,
+          `  Python   ${config.pythonPath}`,
+          `  Sox      ${config.soxPath}`,
+          `  Data     ${config.dataDir}`
+        ].join("\n");
+        
+        const depsTable = [
+          "Dependencies:",
+          "  Component  Status",
+          `  Sox        ${soxInstalled ? "✓" : "✗"}`,
+          `  afplay     ${afplayInstalled ? "✓" : "✗"}`,
+          `  say        ${sayInstalled ? "✓" : "✗"}`
+        ].join("\n");
+        
+        const sttTable = [
+          "Speech-to-Text:",
+          "  Engine    installed  Models",
+          `  Whisper   ${mlxWhisperInstalled ? "✓" : "✗"}         ${whisperModels}`,
+          `  Parakeet  ${parakeetInstalled ? "✓" : "✗"}         ${parakeetModels}`
+        ].join("\n");
+        
+        const ttsTable = [
+          "Text-to-Speech:",
+          "  Engine    installed  Voices",
+          `  Piper     ${piperInstalled ? "✓" : "✗"}         ${piperVoices}`,
+          `  Kokoro    ${kokoroInstalled ? "✓" : "✗"}         ${kokoroVoices}${kokoroServerRunning ? " (server)" : ""}`
+        ].join("\n");
+        
+        const servicesTable = [
+          "Background Services:",
+          `  Playback: ${playbackActive ? `Active (PID: ${playbackPid})` : "Stopped"}`,
+          `  Kokoro Server: ${kokoroServerRunning ? "Running" : "Not running"}`
+        ].join("\n");
+        
+        tablesOutput = `
+${runtimeTable}
+
+${depsTable}
+
+${sttTable}
+
+${ttsTable}
+
+${servicesTable}`;
       }
-      console.log(`  Data: ${config.dataDir} ${dataDirExists ? "✓" : "✗"}`);
       
-      // Environment Variables (only if any are set)
-      if (Object.keys(configuredEnvVars).length > 0) {
-        console.log("\nEnvironment Variables (custom overrides):");
-        for (const [key, value] of Object.entries(configuredEnvVars)) {
-          console.log(`  ${key}=${value}`);
-        }
-      }
-      
-      // Dependencies
-      console.log("\nDependencies:");
-      console.log("  Component  Status");
-      console.log(`  Sox        ${soxInstalled ? "✓" : "✗"}`);
-      console.log(`  afplay     ${afplayInstalled ? "✓" : "✗"}`);
-      console.log(`  say        ${sayInstalled ? "✓" : "✗"}`);
-      
-      // Engines
-      console.log("\nSpeech-to-Text:");
-      console.log("  Engine    Status  Models");
-      console.log(`  Whisper   ${mlxWhisperInstalled ? "✓" : "✗"}       ${whisperModels}`);
-      console.log(`  Parakeet  ${parakeetInstalled ? "✓" : "✗"}       ${parakeetModels}`);
-      
-      console.log("\nText-to-Speech:");
-      console.log("  Engine    Status  Voices");
-      console.log(`  Piper     ${piperInstalled ? "✓" : "✗"}       ${piperVoices}`);
-      console.log(`  Kokoro    ${kokoroInstalled ? "✓" : "✗"}       ${kokoroVoices}${kokoroServerRunning ? " (server)" : ""}`);
-      
-      // Playback
-      console.log("\nBackground Services:");
-      console.log(`  Playback: ${playbackActive ? `Active (PID: ${playbackPid})` : "Stopped"}`);
-      console.log(`  Kokoro Server: ${kokoroServerRunning ? "Running" : "Not running"}`);
+      console.log(tablesOutput.trimStart());
       
       // Summary
       const issues: string[] = [];
@@ -1677,7 +1774,7 @@ program
       if (!mlxWhisperInstalled && !parakeetInstalled) issues.push("No STT engine available");
       if (downloadedModels === 0) issues.push("No models downloaded");
       
-      console.log("\n" + "══════════════════════════════════════════════════");
+      console.log("══════════════════════════════════════════════════");
       if (issues.length === 0) {
         console.log("✓ All systems ready!");
       } else {
