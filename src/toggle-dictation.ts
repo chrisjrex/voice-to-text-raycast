@@ -7,7 +7,7 @@ import {
   updateCommandMetadata,
 } from "@raycast/api";
 import { execFile, spawn } from "child_process";
-import { existsSync, statSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, statSync, unlinkSync } from "fs";
 import { join } from "path";
 import { promisify } from "util";
 import { parseModel, transcribe } from "./transcribe";
@@ -70,10 +70,9 @@ async function startRecording(
   soxPath: string,
   silenceTimeout: number,
 ): Promise<void> {
-  const audioPath = join(
-    environment.supportPath,
-    `recording-${Date.now()}.wav`,
-  );
+  const sttDir = join(environment.supportPath, "stt", "recordings");
+  mkdirSync(sttDir, { recursive: true });
+  const audioPath = join(sttDir, `recording-${Date.now()}.wav`);
 
   const recorder = spawn(
     soxPath,

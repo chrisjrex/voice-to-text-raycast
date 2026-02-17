@@ -107,7 +107,7 @@ export class PiperTTSEngine implements TTSEngine {
     config: TTSConfig,
     speed: number = 1.0
   ): Promise<void> {
-    const ttsVoicesDir = join(config.dataDir, "tts-voices");
+    const ttsVoicesDir = join(config.dataDir, "tts", "voices");
     const voicePath = join(ttsVoicesDir, `${voice.id}.onnx`);
     const tempPath = `${outputPath}.temp.wav`;
     
@@ -165,7 +165,7 @@ export class PiperTTSEngine implements TTSEngine {
   }
   
   isVoiceDownloaded(voice: VoiceInfo, config: TTSConfig): boolean {
-    const ttsVoicesDir = join(config.dataDir, "tts-voices");
+    const ttsVoicesDir = join(config.dataDir, "tts", "voices");
     return existsSync(join(ttsVoicesDir, `${voice.id}.onnx`)) &&
            existsSync(join(ttsVoicesDir, `${voice.id}.onnx.json`));
   }

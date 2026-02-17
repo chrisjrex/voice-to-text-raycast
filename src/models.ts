@@ -82,7 +82,7 @@ export const TTS_VOICES: TtsVoice[] = [
 ];
 
 export function ttsVoicesDir(): string {
-  return join(environment.supportPath, "tts-voices");
+  return join(environment.supportPath, "tts", "voices");
 }
 
 export function ttsVoiceOnnxPath(voiceId: string): string {

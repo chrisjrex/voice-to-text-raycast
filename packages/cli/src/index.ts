@@ -6,9 +6,8 @@
 
 import { Command } from "commander";
 import { readFileSync, existsSync, statSync, unlinkSync } from "fs";
-const TerminalTable = require("terminal-table");
 import { loadConfig, log, getRuntimeInfo } from "../../core/dist/index.js";
-import { getVoiceByAlias, listAllVoices, getModelByAlias, listAllModels } from "../../core/dist/index.js";
+import { getVoiceByAlias, getVoiceByAliasAndEngine, listAllVoices, getModelByAlias, listAllModels } from "../../core/dist/index.js";
 import { getTTSEngine, SystemTTSEngine } from "../../core/dist/index.js";
 import { getSTTEngine, isSoxAvailable } from "../../core/dist/index.js";
 import { 
@@ -48,14 +47,15 @@ program
   .command("speak [text]")
   .description("Convert text to speech")
   .option("-f, --file <path>", "Read text from file")
+  .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
   .option("-v, --voice <name>", "Voice alias (e.g., Heart, Amy, Samantha)", process.env.VTT_DEFAULT_TTS_VOICE || "Samantha")
   .option("-s, --speed <factor>", "Playback speed factor (0.5-2.0)", "1.0")
   .option("-o, --output <path>", "Save to file instead of playing")
   .option("-q, --quiet", "Suppress non-error output")
-  .action(async (text: string | undefined, options) => {
+  .action(async (text: string | undefined, options: { file?: string; engine?: string; voice: string; speed: string; output?: string; quiet?: boolean }) => {
     const config = loadConfig();
     const quiet = options.quiet || false;
-    
+
     // Get text from various sources
     let textToSpeak: string;
     if (options.file) {
@@ -73,7 +73,7 @@ program
       process.stdin.on("data", (chunk) => chunks.push(chunk));
       await new Promise((resolve) => process.stdin.on("end", resolve));
       textToSpeak = Buffer.concat(chunks).toString("utf-8").trim();
-      
+
       if (!textToSpeak) {
         console.error("Error: No text provided. Use --file, provide text as argument, or pipe via stdin.");
         process.exit(1);
@@ -86,18 +86,29 @@ program
       console.error('  echo "Hello" | vtt speak');
       process.exit(1);
     }
-    
+
     // Parse speed
     const speed = parseFloat(options.speed);
     if (isNaN(speed) || speed < 0.5 || speed > 2.0) {
       console.error("Error: Speed must be between 0.5 and 2.0");
       process.exit(1);
     }
-    
-    // Resolve voice
-    const voice = getVoiceByAlias(options.voice);
+
+    // Engine is required - from command line, config, or environment variable
+    const engineName = options.engine || config.defaultTTSEngine || process.env.VTT_DEFAULT_TTS_ENGINE;
+
+    if (!engineName) {
+      console.error(`Error: --engine is required for speaking.`);
+      console.error(`Usage: vtt speak "Hello" --engine <piper|kokoro|system>`);
+      console.error(`Or set VTT_DEFAULT_TTS_ENGINE environment variable.`);
+      console.error(`Run 'vtt voices list' to see available voices and their engines.`);
+      process.exit(ExitCodes.GENERAL_ERROR);
+    }
+
+    // Look up voice by alias and specific engine
+    const voice = getVoiceByAliasAndEngine(options.voice, engineName);
     if (!voice) {
-      console.error(`Error: Unknown voice "${options.voice}"`);
+      console.error(`Error: Unknown voice "${options.voice}" for engine "${engineName}"`);
       console.error(`Run 'vtt voices list' to see available voices.`);
       process.exit(ExitCodes.UNKNOWN_VOICE);
     }
@@ -115,13 +126,13 @@ program
         const isDownloaded = engine.isVoiceDownloaded(voice, config);
         if (!isDownloaded) {
           console.error(`Error: Voice "${options.voice}" (${voice.provider}) not downloaded.`);
-          console.error(`Run: vtt voices download ${options.voice}`);
+          console.error(`Run: vtt voices download ${options.voice} --engine ${voice.provider}`);
           process.exit(3);
         }
       }
       
       // Generate audio
-      const outputPath = options.output || join(config.dataDir, `tts-${Date.now()}.wav`);
+      const outputPath = options.output || join(config.dataDir, "tts", "tmp", `${Date.now()}.wav`);
       
       if (voice.provider === "system") {
         // System voices use native speed control
@@ -217,21 +228,27 @@ voicesCmd
       return acc;
     }, {} as Record<string, typeof voices>);
     
-    const tableOpts = {
-      borderStyle: 1,
-      horizontalLine: true,
-      leftPadding: 2,
-      rightPadding: 2
+    // Helper to format row
+    const formatRow = (cols: string[], widths: number[]) => {
+      return cols.map((col, i) => col.padEnd(widths[i])).join("  ");
     };
     
-    // Print all voices in a single table
-    const table = new TerminalTable(tableOpts);
-    table.push(["Name", "Provider", "Status", "Accent", "Gender"]);
+    // Calculate column widths
+    const nameWidth = Math.max("Name".length, ...voices.map(v => v.alias.length)) + 2;
+    const providerWidth = Math.max("Provider".length, ...voices.map(v => v.info.provider.length)) + 2;
+    const statusWidth = Math.max("Status".length, "Built-in".length, "✓ Downloaded".length, "Not installed".length) + 2;
+    const accentWidth = Math.max("Accent".length, ...voices.map(v => v.info.accent.length)) + 2;
+    const genderWidth = Math.max("Gender".length, ...voices.map(v => v.info.gender.length)) + 2;
+    
+    const widths = [nameWidth, providerWidth, statusWidth, accentWidth, genderWidth];
+    
+    // Print header
+    console.log(formatRow(["Name", "Provider", "Status", "Accent", "Gender"], widths));
     
     // Print system voices first (always available)
     if (grouped["system"]) {
       for (const { alias, info } of grouped["system"]) {
-        table.push([alias, "System", "Built-in", info.accent, info.gender]);
+        console.log(formatRow([alias, "System", "Built-in", info.accent, info.gender], widths));
       }
     }
     
@@ -240,7 +257,7 @@ voicesCmd
       for (const { alias, info } of grouped["piper"]) {
         const engine = getTTSEngine(info);
         const status = engine.isVoiceDownloaded(info, config) ? "✓ Downloaded" : "Not installed";
-        table.push([alias, "Piper", status, info.accent, info.gender]);
+        console.log(formatRow([alias, "Piper", status, info.accent, info.gender], widths));
       }
     }
     
@@ -249,66 +266,113 @@ voicesCmd
       for (const { alias, info } of grouped["kokoro"]) {
         const engine = getTTSEngine(info);
         const status = engine.isVoiceDownloaded(info, config) ? "✓ Downloaded" : "Not installed";
-        table.push([alias, "Kokoro", status, info.accent, info.gender]);
+        console.log(formatRow([alias, "Kokoro", status, info.accent, info.gender], widths));
       }
     }
-    
-    console.log(table.toString());
   });
 
 voicesCmd
   .command("download <voice>")
-  .description("Download a voice by alias")
-  .action(async (voiceAlias: string) => {
+  .description("Download a voice by alias (requires --engine or VTT_DEFAULT_TTS_ENGINE)")
+  .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
+  .action(async (voiceAlias: string, options: { engine?: string }) => {
     const config = loadConfig();
-    const voice = getVoiceByAlias(voiceAlias);
     const { homedir } = require("os");
     const { join } = require("path");
     const { existsSync, mkdirSync } = require("fs");
-    
+
+    // Engine is required - from command line, config, or environment variable
+    const engineName = options.engine || config.defaultTTSEngine || process.env.VTT_DEFAULT_TTS_ENGINE;
+
+    if (!engineName) {
+      console.error(`Error: --engine is required for downloading voices.`);
+      console.error(`Usage: vtt voices download ${voiceAlias} --engine <piper|kokoro>`);
+      console.error(`Or set VTT_DEFAULT_TTS_ENGINE environment variable.`);
+      console.error(`Run 'vtt voices list' to see available voices and their engines.`);
+      process.exit(ExitCodes.GENERAL_ERROR);
+    }
+
+    // Look up voice by alias and specific engine
+    const voice = getVoiceByAliasAndEngine(voiceAlias, engineName);
+
     if (!voice) {
-      console.error(`Error: Unknown voice "${voiceAlias}"`);
+      console.error(`Error: Unknown voice "${voiceAlias}" for engine "${engineName}"`);
       console.error(`Run 'vtt voices list' to see available voices.`);
       process.exit(ExitCodes.UNKNOWN_VOICE);
     }
-    
+
+    // System voices cannot be downloaded
     if (voice.provider === "system") {
-      console.log(`Voice "${voiceAlias}" is a system voice and doesn't require downloading.`);
-      return;
+      console.error(`Error: Voice "${voiceAlias}" is a system voice and cannot be downloaded.`);
+      console.error(`System voices are built-in and always available.`);
+      process.exit(ExitCodes.GENERAL_ERROR);
     }
     
-    // Install required Python package if not already installed
-    const requiredPackage = voice.provider === "piper" ? "piper-tts" : "kokoro";
-    console.log(`Installing ${requiredPackage}...`);
+    // Check if engine is already installed
+    const engine = getTTSEngine(voice);
+    const engineAvailable = await engine.isAvailable(config);
     
-    const { spawn } = require("child_process");
-    const pipArgs = getPipInstallArgs(config.pythonPath);
-    
-    await new Promise<void>((resolve, reject) => {
-      const installProc = spawn(config.pythonPath, [...pipArgs, requiredPackage], {
-        stdio: "inherit"
-      });
+    if (!engineAvailable) {
+      const requiredPackage = voice.provider === "piper" ? "piper-tts" : "kokoro";
+      const askPermission = process.env.VTT_ASK_PERMISSION !== "false";
       
-      installProc.on("close", (code: number) => {
-        if (code !== 0) {
-          reject(new Error(`Failed to install ${requiredPackage}`));
-        } else {
-          console.log(`✓ Installed ${requiredPackage}\n`);
-          resolve();
+      if (askPermission) {
+        // Interactive mode - ask for permission
+        const readline = require("readline");
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
+        
+        const answer = await new Promise<string>((resolve) => {
+          rl.question(`The ${voice.provider} engine is not installed. Install ${requiredPackage}? (y/N): `, resolve);
+        });
+        
+        rl.close();
+        
+        if (answer.toLowerCase() !== "y" && answer.toLowerCase() !== "yes") {
+          console.log("Installation cancelled.");
+          console.log(`To skip this prompt in the future, set VTT_ASK_PERMISSION=false`);
+          process.exit(ExitCodes.GENERAL_ERROR);
         }
-      });
+      } else {
+        // Headless mode - auto-install
+        console.log(`VTT_ASK_PERMISSION=false: Auto-installing ${requiredPackage}...`);
+      }
       
-      installProc.on("error", reject);
-    }).catch((error) => {
-      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
-      process.exit(1);
-    });
+      // Install required Python package
+      console.log(`Installing ${requiredPackage}...`);
+      
+      const { spawn } = require("child_process");
+      const pipArgs = getPipInstallArgs(config.pythonPath);
+      
+      await new Promise<void>((resolve, reject) => {
+        const installProc = spawn(config.pythonPath, [...pipArgs, requiredPackage], {
+          stdio: "inherit"
+        });
+        
+        installProc.on("close", (code: number) => {
+          if (code !== 0) {
+            reject(new Error(`Failed to install ${requiredPackage}`));
+          } else {
+            console.log(`✓ Installed ${requiredPackage}\n`);
+            resolve();
+          }
+        });
+        
+        installProc.on("error", reject);
+      }).catch((error) => {
+        console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      });
+    }
     
     console.log(`Downloading ${voiceAlias} (${voice.provider})...`);
+    const { spawn } = require("child_process");
     
     if (voice.provider === "piper") {
       // Download Piper voice files
-      const ttsVoicesDir = join(config.dataDir, "tts-voices");
+      const ttsVoicesDir = join(config.dataDir, "tts", "voices");
       if (!existsSync(ttsVoicesDir)) {
         mkdirSync(ttsVoicesDir, { recursive: true });
       }
@@ -360,58 +424,89 @@ print(path)
 
 voicesCmd
   .command("delete <voice>")
-  .description("Delete a downloaded voice")
-  .action(async (voiceAlias: string) => {
-    const voice = getVoiceByAlias(voiceAlias);
-    
+  .description("Delete a downloaded voice (requires --engine or VTT_DEFAULT_TTS_ENGINE)")
+  .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
+  .action(async (voiceAlias: string, options: { engine?: string }) => {
+    const config = loadConfig();
+
+    // Engine is required - from command line, config, or environment variable
+    const engineName = options.engine || config.defaultTTSEngine || process.env.VTT_DEFAULT_TTS_ENGINE;
+
+    if (!engineName) {
+      console.error(`Error: --engine is required for deleting voices.`);
+      console.error(`Usage: vtt voices delete ${voiceAlias} --engine <piper|kokoro>`);
+      console.error(`Or set VTT_DEFAULT_TTS_ENGINE environment variable.`);
+      console.error(`Run 'vtt voices list' to see available voices and their engines.`);
+      process.exit(ExitCodes.GENERAL_ERROR);
+    }
+
+    // Look up voice by alias and specific engine
+    const voice = getVoiceByAliasAndEngine(voiceAlias, engineName);
+
     if (!voice) {
-      console.error(`Error: Unknown voice "${voiceAlias}"`);
+      console.error(`Error: Unknown voice "${voiceAlias}" for engine "${engineName}"`);
       console.error(`Run 'vtt voices list' to see available voices.`);
       process.exit(ExitCodes.UNKNOWN_VOICE);
     }
-    
+
+    // System voices cannot be deleted
     if (voice.provider === "system") {
-      console.error("System voices cannot be deleted.");
-      process.exit(1);
+      console.error(`Error: Voice "${voiceAlias}" is a system voice and cannot be deleted.`);
+      console.error(`System voices are built-in and always available.`);
+      process.exit(ExitCodes.GENERAL_ERROR);
     }
-    
-    console.log(`Deleting ${voiceAlias}...`);
+
+    console.log(`Deleting ${voiceAlias} (${voice.provider})...`);
     // TODO: Implement delete logic
     console.log("Delete functionality not yet implemented.");
   });
 
 voicesCmd
   .command("preview <voice>")
-  .description("Preview a voice")
+  .description("Preview a voice (requires --engine or VTT_DEFAULT_TTS_ENGINE)")
+  .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
   .option("-s, --speed <factor>", "Playback speed factor (0.5-2.0)", "1.0")
-  .action(async (voiceAlias: string, options) => {
+  .action(async (voiceAlias: string, options: { engine?: string; speed: string }) => {
     const config = loadConfig();
-    const voice = getVoiceByAlias(voiceAlias);
-    
+
+    // Engine is required - from command line, config, or environment variable
+    const engineName = options.engine || config.defaultTTSEngine || process.env.VTT_DEFAULT_TTS_ENGINE;
+
+    if (!engineName) {
+      console.error(`Error: --engine is required for previewing voices.`);
+      console.error(`Usage: vtt voices preview ${voiceAlias} --engine <piper|kokoro|system>`);
+      console.error(`Or set VTT_DEFAULT_TTS_ENGINE environment variable.`);
+      console.error(`Run 'vtt voices list' to see available voices and their engines.`);
+      process.exit(ExitCodes.GENERAL_ERROR);
+    }
+
+    // Look up voice by alias and specific engine
+    const voice = getVoiceByAliasAndEngine(voiceAlias, engineName);
+
     if (!voice) {
-      console.error(`Error: Unknown voice "${voiceAlias}"`);
+      console.error(`Error: Unknown voice "${voiceAlias}" for engine "${engineName}"`);
       console.error(`Run 'vtt voices list' to see available voices.`);
       process.exit(ExitCodes.UNKNOWN_VOICE);
     }
-    
+
     const speed = parseFloat(options.speed);
     if (isNaN(speed) || speed < 0.5 || speed > 2.0) {
       console.error("Error: Speed must be between 0.5 and 2.0");
       process.exit(1);
     }
-    
+
     // Check if downloaded (skip for system)
     if (voice.provider !== "system") {
       const engine = getTTSEngine(voice);
       if (!engine.isVoiceDownloaded(voice, config)) {
         console.error(`Error: Voice "${voiceAlias}" (${voice.provider}) not downloaded.`);
-        console.error(`Run: vtt voices download ${voiceAlias}`);
+        console.error(`Run: vtt voices download ${voiceAlias} --engine ${voice.provider}`);
         process.exit(3);
       }
     }
     
     const previewText = "Hello! This is a preview of my voice.";
-    const outputPath = join(config.dataDir, `preview-${voiceAlias}-${Date.now()}.wav`);
+    const outputPath = join(config.dataDir, "tts", "previews", `preview-${voiceAlias}-${Date.now()}.wav`);
     
     try {
       const engine = getTTSEngine(voice);
@@ -500,7 +595,7 @@ transcribeCmd
     }
     
     // Check if already running
-    const pidPath = join(config.dataDir, "transcribe_daemon.pid");
+    const pidPath = join(config.dataDir, "stt", "daemon", "transcribe_daemon.pid");
     if (existsSync(pidPath)) {
       try {
         const pid = parseInt(readFileSync(pidPath, "utf-8").trim(), 10);
@@ -628,12 +723,12 @@ except:
     pass
 `.trim();
 
-    const daemonPath = join(config.dataDir, "transcribe_daemon.py");
+    const daemonPath = join(config.dataDir, "stt", "daemon", "transcribe_daemon.py");
     writeFileSync(daemonPath, daemonScript);
     
     // Start daemon
     const { openSync } = require("fs");
-    const logFd = openSync(join(config.dataDir, "transcribe_daemon.log"), "a");
+    const logFd = openSync(join(config.dataDir, "stt", "daemon", "transcribe_daemon.log"), "a");
     
     const daemonProc = spawn(config.pythonPath, [daemonPath], {
       detached: true,
@@ -659,7 +754,7 @@ transcribeCmd
   .description("Stop background transcription and transcribe audio")
   .action(async () => {
     const config = loadConfig();
-    const pidPath = join(config.dataDir, "transcribe_daemon.pid");
+    const pidPath = join(config.dataDir, "stt", "daemon", "transcribe_daemon.pid");
     
     if (!existsSync(pidPath)) {
       console.error("No transcription daemon is running");
@@ -681,7 +776,7 @@ transcribeCmd
   .description("Check background transcription status")
   .action(async () => {
     const config = loadConfig();
-    const pidPath = join(config.dataDir, "transcribe_daemon.pid");
+    const pidPath = join(config.dataDir, "stt", "daemon", "transcribe_daemon.pid");
     const outputPath = join(config.dataDir, "transcription.json");
     
     let isRunning = false;
@@ -818,7 +913,7 @@ transcribeCmd
       }
     } else {
       // Record audio
-      audioPath = join(config.dataDir, `recording-${Date.now()}.wav`);
+      audioPath = join(config.dataDir, "stt", "recordings", `recording-${Date.now()}.wav`);
       
       const silenceTimeout = parseInt(options.silenceTimeout, 10) || 0;
       const silenceThreshold = parseFloat(options.silenceThreshold) || 0.02;
@@ -966,23 +1061,28 @@ modelsCmd
   .action(async () => {
     const models = listAllModels();
     
-    const tableOpts = {
-      borderStyle: 1,
-      horizontalLine: true,
-      leftPadding: 2,
-      rightPadding: 2
+    // Helper to format row
+    const formatRow = (cols: string[], widths: number[]) => {
+      return cols.map((col, i) => col.padEnd(widths[i])).join("  ");
     };
     
-    const table = new TerminalTable(tableOpts);
-    table.push(["Alias", "Provider", "Status", "Size", "Description"]);
+    // Calculate column widths
+    const aliasWidth = Math.max("Alias".length, ...models.map(m => m.alias.length)) + 2;
+    const providerWidth = Math.max("Provider".length, ...models.map(m => m.info.provider.length)) + 2;
+    const statusWidth = Math.max("Status".length, "✓ Downloaded".length, "Not installed".length) + 2;
+    const sizeWidth = Math.max("Size".length, ...models.map(m => m.info.size.length)) + 2;
+    const descWidth = Math.max("Description".length, ...models.map(m => m.info.description.length)) + 2;
+    
+    const widths = [aliasWidth, providerWidth, statusWidth, sizeWidth, descWidth];
+    
+    // Print header and rows
+    console.log(formatRow(["Alias", "Provider", "Status", "Size", "Description"], widths));
     
     for (const { alias, info } of models) {
       const engine = getSTTEngine(info);
       const status = engine.isModelDownloaded(info) ? "✓ Downloaded" : "Not installed";
-      table.push([alias, info.provider, status, info.size, info.description]);
+      console.log(formatRow([alias, info.provider, status, info.size, info.description], widths));
     }
-    
-    console.log(table.toString());
   });
 
 modelsCmd
@@ -1156,7 +1256,7 @@ import json, os, select, signal, socket, sys, time, numpy as np, soundfile as sf
 from kokoro import KPipeline
 
 SOCK_PATH = ${JSON.stringify(config.kokoroSocket)}
-PID_PATH = ${JSON.stringify(join(config.dataDir, "kokoro_server.pid"))}
+PID_PATH = ${JSON.stringify(join(config.dataDir, "tts", "daemon", "kokoro_server.pid"))}
 IDLE_TIMEOUT = ${timeout}
 
 pipelines = {}
@@ -1224,13 +1324,13 @@ while True:
     last_activity = time.monotonic()
 `.trim();
     
-    const scriptPath = join(config.dataDir, "kokoro_server.py");
+    const scriptPath = join(config.dataDir, "tts", "daemon", "kokoro_server.py");
     const { writeFileSync } = require("fs");
     writeFileSync(scriptPath, serverScript);
     
     // Start server in background
     const { openSync } = require("fs");
-    const logFd = openSync(join(config.dataDir, "kokoro_server.log"), "a");
+    const logFd = openSync(join(config.dataDir, "tts", "daemon", "kokoro_server.log"), "a");
     
     const proc = spawn(config.kokoroPythonPath, [scriptPath], {
       detached: true,
@@ -1286,7 +1386,7 @@ serverCmd
   .description("Stop the Kokoro TTS server")
   .action(async () => {
     const config = loadConfig();
-    const pidPath = join(config.dataDir, "kokoro_server.pid");
+    const pidPath = join(config.dataDir, "tts", "daemon", "kokoro_server.pid");
     
     if (!existsSync(pidPath)) {
       console.log("Server is not running (no PID file found).");
@@ -1338,7 +1438,7 @@ serverCmd
       console.log("Status: Running");
       console.log(`Socket: ${config.kokoroSocket}`);
       
-      const pidPath = join(config.dataDir, "kokoro_server.pid");
+      const pidPath = join(config.dataDir, "tts", "daemon", "kokoro_server.pid");
       if (existsSync(pidPath)) {
         const pid = readFileSync(pidPath, "utf-8").trim();
         console.log(`PID: ${pid}`);
@@ -1377,7 +1477,9 @@ program
     if (process.env.VTT_SOX_PATH) configuredEnvVars.VTT_SOX_PATH = process.env.VTT_SOX_PATH;
     if (process.env.VTT_DATA_DIR) configuredEnvVars.VTT_DATA_DIR = process.env.VTT_DATA_DIR;
     if (process.env.VTT_DEFAULT_STT_MODEL) configuredEnvVars.VTT_DEFAULT_STT_MODEL = process.env.VTT_DEFAULT_STT_MODEL;
+    if (process.env.VTT_DEFAULT_TTS_ENGINE) configuredEnvVars.VTT_DEFAULT_TTS_ENGINE = process.env.VTT_DEFAULT_TTS_ENGINE;
     if (process.env.VTT_DEFAULT_TTS_VOICE) configuredEnvVars.VTT_DEFAULT_TTS_VOICE = process.env.VTT_DEFAULT_TTS_VOICE;
+    if (process.env.VTT_ASK_PERMISSION) configuredEnvVars.VTT_ASK_PERMISSION = process.env.VTT_ASK_PERMISSION;
     
     // Check dependencies
     const soxInstalled = await checkCommand(config.soxPath, ["--version"]);
@@ -1398,7 +1500,7 @@ program
     let kokoroVoices = 0;
     
     // Count Piper voices
-    const ttsVoicesDir = join(config.dataDir, "tts-voices");
+    const ttsVoicesDir = join(config.dataDir, "tts", "voices");
     if (existsSync(ttsVoicesDir)) {
       try {
         const files = readdirSync(ttsVoicesDir);
@@ -1424,12 +1526,21 @@ program
     // Count downloaded models
     const allModels = listAllModels();
     let downloadedModels = 0;
+    let whisperModels = 0;
+    let parakeetModels = 0;
     const modelStatusList: Array<{ name: string; downloaded: boolean; engine: string; type: string }> = [];
-    
+
     for (const { alias, info } of allModels) {
       const engine = getSTTEngine(info);
       const isDownloaded = engine.isModelDownloaded(info);
-      if (isDownloaded) downloadedModels++;
+      if (isDownloaded) {
+        downloadedModels++;
+        if (info.provider === "whisper") {
+          whisperModels++;
+        } else if (info.provider === "parakeet") {
+          parakeetModels++;
+        }
+      }
       modelStatusList.push({
         name: info.name,
         downloaded: isDownloaded,
@@ -1497,7 +1608,9 @@ program
       },
       models: {
         total: allModels.length,
-        downloaded: downloadedModels
+        downloaded: downloadedModels,
+        whisper: whisperModels,
+        parakeet: parakeetModels
       },
       playback: {
         active: playbackActive,
@@ -1511,15 +1624,8 @@ program
       const cleanReport = JSON.parse(JSON.stringify(report));
       console.log(JSON.stringify(cleanReport, null, 2));
     } else {
-      const tableOpts = {
-        borderStyle: 1,
-        horizontalLine: true,
-        leftPadding: 1,
-        rightPadding: 1
-      };
-      
       console.log("\nVTT Doctor - System Health Check");
-      console.log("═".repeat(50));
+      console.log("══════════════════════════════════════════════════");
       
       // Runtime
       const runtimeTypeDisplay = {
@@ -1544,35 +1650,21 @@ program
       
       // Dependencies
       console.log("\nDependencies:");
-      const depsTable = new TerminalTable(tableOpts);
-      depsTable.push(["Component", "Status"]);
-      depsTable.push(["Sox", soxInstalled ? "✓" : "✗"]);
-      depsTable.push(["afplay", afplayInstalled ? "✓" : "✗"]);
-      depsTable.push(["say", sayInstalled ? "✓" : "✗"]);
-      console.log(depsTable.toString());
+      console.log("  Component  Status");
+      console.log(`  Sox        ${soxInstalled ? "✓" : "✗"}`);
+      console.log(`  afplay     ${afplayInstalled ? "✓" : "✗"}`);
+      console.log(`  say        ${sayInstalled ? "✓" : "✗"}`);
       
       // Engines
-      console.log("\nSpeech Engines:");
-      const enginesTable = new TerminalTable(tableOpts);
-      enginesTable.push(["Engine", "Status", "Voices"]);
-      enginesTable.push(["Whisper", mlxWhisperInstalled ? "✓" : "✗", "-"]);
-      enginesTable.push(["Parakeet", parakeetInstalled ? "✓" : "✗", "-"]);
-      enginesTable.push(["Piper", piperInstalled ? "✓" : "✗", piperVoices.toString()]);
-      enginesTable.push(["Kokoro", kokoroInstalled ? "✓" : "✗", `${kokoroVoices}${kokoroServerRunning ? " (server)" : ""}`]);
-      console.log(enginesTable.toString());
+      console.log("\nSpeech-to-Text:");
+      console.log("  Engine    Status  Models");
+      console.log(`  Whisper   ${mlxWhisperInstalled ? "✓" : "✗"}       ${whisperModels}`);
+      console.log(`  Parakeet  ${parakeetInstalled ? "✓" : "✗"}       ${parakeetModels}`);
       
-      // Models
-      console.log("\nModels Downloaded:");
-      if (downloadedModels === 0) {
-        console.log("  None. Run: vtt models download <model>");
-      } else {
-        const modelsTable = new TerminalTable(tableOpts);
-        modelsTable.push(["Name", "Engine"]);
-        for (const m of modelStatusList.filter(m => m.downloaded)) {
-          modelsTable.push([m.name, m.engine]);
-        }
-        console.log(modelsTable.toString());
-      }
+      console.log("\nText-to-Speech:");
+      console.log("  Engine    Status  Voices");
+      console.log(`  Piper     ${piperInstalled ? "✓" : "✗"}       ${piperVoices}`);
+      console.log(`  Kokoro    ${kokoroInstalled ? "✓" : "✗"}       ${kokoroVoices}${kokoroServerRunning ? " (server)" : ""}`);
       
       // Playback
       console.log("\nBackground Services:");
@@ -1585,7 +1677,7 @@ program
       if (!mlxWhisperInstalled && !parakeetInstalled) issues.push("No STT engine available");
       if (downloadedModels === 0) issues.push("No models downloaded");
       
-      console.log("\n" + "═".repeat(50));
+      console.log("\n" + "══════════════════════════════════════════════════");
       if (issues.length === 0) {
         console.log("✓ All systems ready!");
       } else {
@@ -1594,6 +1686,365 @@ program
           console.log(`  - ${issue}`);
         }
       }
+      console.log();
+    }
+  });
+
+// Storage command - shows paths and sizes of dependencies and downloads
+program
+  .command("storage")
+  .description("Show storage usage of dependencies, models, and voices")
+  .option("-j, --json", "Output in JSON format")
+  .action(async (options) => {
+    const config = loadConfig();
+    const runtimeInfo = getRuntimeInfo();
+    const { spawn } = require("child_process");
+    const { homedir } = require("os");
+    const { join } = require("path");
+    const { readdirSync, existsSync, statSync } = require("fs");
+    
+    // Helper to format bytes to human readable
+    function formatBytes(bytes: number): string {
+      if (bytes === 0) return "0 B";
+      const k = 1024;
+      const sizes = ["B", "KB", "MB", "GB", "TB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    }
+    
+    // Helper to get file/directory size
+    function getSize(path: string): number {
+      if (!existsSync(path)) return 0;
+      const stats = statSync(path);
+      if (!stats.isDirectory()) return stats.size;
+      
+      let total = 0;
+      try {
+        const files = readdirSync(path, { recursive: true }) as string[];
+        for (const file of files) {
+          const filePath = join(path, file);
+          try {
+            const s = statSync(filePath);
+            if (s.isFile()) total += s.size;
+          } catch {}
+        }
+      } catch {}
+      return total;
+    }
+    
+    // Helper to check if command exists and get its path
+    async function getCommandPath(cmd: string): Promise<string | null> {
+      return new Promise((resolve) => {
+        const proc = spawn("which", [cmd], { timeout: 5000 });
+        let output = "";
+        proc.stdout.on("data", (data: Buffer) => { output += data.toString(); });
+        proc.on("close", (code: number) => resolve(code === 0 ? output.trim() : null));
+        proc.on("error", () => resolve(null));
+      });
+    }
+    
+    // Get executable paths
+    const pythonPath = config.pythonPath;
+    const soxPath = config.soxPath;
+    const afplayPath = await getCommandPath("afplay");
+    const sayPath = await getCommandPath("say");
+    
+    // Get executable sizes
+    const pythonSize = existsSync(pythonPath) ? getSize(pythonPath) : 0;
+    const soxSize = existsSync(soxPath) ? getSize(soxPath) : 0;
+    const afplaySize = afplayPath && existsSync(afplayPath) ? getSize(afplayPath) : 0;
+    const saySize = sayPath && existsSync(sayPath) ? getSize(sayPath) : 0;
+    
+    // Get HuggingFace cache directory
+    const hfCacheDir = join(homedir(), ".cache/huggingface/hub");
+    const hfCacheSize = existsSync(hfCacheDir) ? getSize(hfCacheDir) : 0;
+    
+    // Get data directory subdirectories
+    const sttDaemonDir = join(config.dataDir, "stt", "daemon");
+    const sttRecordingsDir = join(config.dataDir, "stt", "recordings");
+    const ttsTmpDir = join(config.dataDir, "tts", "tmp");
+    const ttsPreviewsDir = join(config.dataDir, "tts", "previews");
+    const ttsRecordingsDir = join(config.dataDir, "tts", "recordings");
+    const ttsVoicesDir = join(config.dataDir, "tts", "voices");
+    const venvDir = join(config.dataDir, "venv");
+
+    const sttDaemonSize = existsSync(sttDaemonDir) ? getSize(sttDaemonDir) : 0;
+    const sttRecordingsSize = existsSync(sttRecordingsDir) ? getSize(sttRecordingsDir) : 0;
+    const ttsTmpSize = existsSync(ttsTmpDir) ? getSize(ttsTmpDir) : 0;
+    const ttsPreviewsSize = existsSync(ttsPreviewsDir) ? getSize(ttsPreviewsDir) : 0;
+    const ttsRecordingsSize = existsSync(ttsRecordingsDir) ? getSize(ttsRecordingsDir) : 0;
+    const ttsVoicesSize = existsSync(ttsVoicesDir) ? getSize(ttsVoicesDir) : 0;
+    const venvSize = existsSync(venvDir) ? getSize(venvDir) : 0;
+
+    const sttSize = sttDaemonSize + sttRecordingsSize;
+    const ttsSize = ttsTmpSize + ttsPreviewsSize + ttsRecordingsSize + ttsVoicesSize;
+    const dataDirSize = sttSize + ttsSize + venvSize;
+    
+    // Get models info
+    const allModels = listAllModels();
+    const modelsInfo: Array<{
+      alias: string;
+      id: string;
+      provider: string;
+      downloaded: boolean;
+      path: string | null;
+      size: number;
+    }> = [];
+    
+    for (const { alias, info } of allModels) {
+      const engine = getSTTEngine(info);
+      const isDownloaded = engine.isModelDownloaded(info);
+      let modelPath: string | null = null;
+      let modelSize = 0;
+      
+      if (isDownloaded) {
+        const downloadedModelPath = join(hfCacheDir, `models--${info.id.replace(/\//g, "--")}`);
+        modelPath = downloadedModelPath;
+        modelSize = existsSync(downloadedModelPath) ? getSize(downloadedModelPath) : 0;
+      }
+      
+      modelsInfo.push({
+        alias,
+        id: info.id,
+        provider: info.provider,
+        downloaded: isDownloaded,
+        path: modelPath,
+        size: modelSize
+      });
+    }
+    
+    // Get voices info
+    const allVoices = listAllVoices();
+    const voicesInfo: Array<{
+      alias: string;
+      provider: string;
+      downloaded: boolean;
+      path: string | null;
+      size: number;
+    }> = [];
+    
+    // Piper voices directory
+    const piperVoicesDir = join(config.dataDir, "tts", "voices");
+    
+    // Kokoro voices directory
+    const kokoroCacheDir = join(homedir(), ".cache/huggingface/hub/models--hexgrad--Kokoro-82M/snapshots");
+    let kokoroVoicesDir: string | null = null;
+    if (existsSync(kokoroCacheDir)) {
+      try {
+        const snapshots = readdirSync(kokoroCacheDir);
+        if (snapshots.length > 0) {
+          kokoroVoicesDir = join(kokoroCacheDir, snapshots[0], "voices");
+        }
+      } catch {}
+    }
+    
+    for (const { alias, info } of allVoices) {
+      if (info.provider === "system") {
+        voicesInfo.push({
+          alias,
+          provider: "system",
+          downloaded: true,
+          path: null,
+          size: 0
+        });
+        continue;
+      }
+      
+      const engine = getTTSEngine(info);
+      const isDownloaded = engine.isVoiceDownloaded(info, config);
+      let voicePath: string | null = null;
+      let voiceSize = 0;
+      
+      if (isDownloaded && info.provider === "piper") {
+        const piperVoicePath = join(piperVoicesDir, `${info.id}.onnx`);
+        voicePath = piperVoicePath;
+        if (existsSync(piperVoicePath)) {
+          voiceSize = getSize(piperVoicePath);
+          // Add config file size if exists
+          const configPath = `${piperVoicePath}.json`;
+          if (existsSync(configPath)) {
+            voiceSize += getSize(configPath);
+          }
+        }
+      } else if (isDownloaded && info.provider === "kokoro" && kokoroVoicesDir) {
+        const kokoroVoicePath = join(kokoroVoicesDir, `${info.id}.pt`);
+        voicePath = kokoroVoicePath;
+        if (existsSync(kokoroVoicePath)) {
+          voiceSize = getSize(kokoroVoicePath);
+        }
+      }
+      
+      voicesInfo.push({
+        alias,
+        provider: info.provider,
+        downloaded: isDownloaded,
+        path: voicePath,
+        size: voiceSize
+      });
+    }
+    
+    // Calculate totals
+    const totalModelSize = modelsInfo.reduce((sum, m) => sum + m.size, 0);
+    const totalVoiceSize = voicesInfo.reduce((sum, v) => sum + v.size, 0);
+    const totalDependencySize = pythonSize + soxSize;
+    
+    if (options.json) {
+      const report = {
+        timestamp: new Date().toISOString(),
+        dependencies: {
+          python: {
+            path: pythonPath,
+            size: pythonSize,
+            size_human: formatBytes(pythonSize)
+          },
+          sox: {
+            path: soxPath,
+            size: soxSize,
+            size_human: formatBytes(soxSize)
+          },
+          total_size: totalDependencySize,
+          total_size_human: formatBytes(totalDependencySize)
+        },
+        storage: {
+          data_dir: {
+            path: config.dataDir,
+            size: dataDirSize,
+            size_human: formatBytes(dataDirSize),
+            stt: {
+              size: sttSize,
+              size_human: formatBytes(sttSize),
+              daemon: { size: sttDaemonSize, size_human: formatBytes(sttDaemonSize) },
+              recordings: { size: sttRecordingsSize, size_human: formatBytes(sttRecordingsSize) }
+            },
+            tts: {
+              size: ttsSize,
+              size_human: formatBytes(ttsSize),
+              voices: { size: ttsVoicesSize, size_human: formatBytes(ttsVoicesSize) },
+              previews: { size: ttsPreviewsSize, size_human: formatBytes(ttsPreviewsSize) },
+              recordings: { size: ttsRecordingsSize, size_human: formatBytes(ttsRecordingsSize) },
+              tmp: { size: ttsTmpSize, size_human: formatBytes(ttsTmpSize) }
+            },
+            venv: { size: venvSize, size_human: formatBytes(venvSize) }
+          },
+          huggingface_cache: {
+            path: hfCacheDir,
+            size: hfCacheSize,
+            size_human: formatBytes(hfCacheSize),
+            models: { size: totalModelSize, size_human: formatBytes(totalModelSize) }
+          }
+        },
+        models: {
+          items: modelsInfo.map(m => ({
+            alias: m.alias,
+            id: m.id,
+            provider: m.provider,
+            downloaded: m.downloaded,
+            path: m.path,
+            size: m.size,
+            size_human: formatBytes(m.size)
+          })),
+          total_size: totalModelSize,
+          total_size_human: formatBytes(totalModelSize),
+          downloaded_count: modelsInfo.filter(m => m.downloaded).length
+        },
+        voices: {
+          items: voicesInfo.map(v => ({
+            alias: v.alias,
+            provider: v.provider,
+            downloaded: v.downloaded,
+            path: v.path,
+            size: v.size,
+            size_human: formatBytes(v.size)
+          })),
+          total_size: totalVoiceSize,
+          total_size_human: formatBytes(totalVoiceSize),
+          downloaded_count: voicesInfo.filter(v => v.downloaded && v.provider !== "system").length
+        },
+        totals: {
+          stt: sttSize,
+          stt_human: formatBytes(sttSize),
+          stt_daemon: sttDaemonSize,
+          stt_daemon_human: formatBytes(sttDaemonSize),
+          stt_recordings: sttRecordingsSize,
+          stt_recordings_human: formatBytes(sttRecordingsSize),
+          tts: ttsSize,
+          tts_human: formatBytes(ttsSize),
+          tts_voices: ttsVoicesSize,
+          tts_voices_human: formatBytes(ttsVoicesSize),
+          tts_previews: ttsPreviewsSize,
+          tts_previews_human: formatBytes(ttsPreviewsSize),
+          tts_recordings: ttsRecordingsSize,
+          tts_recordings_human: formatBytes(ttsRecordingsSize),
+          tts_tmp: ttsTmpSize,
+          tts_tmp_human: formatBytes(ttsTmpSize),
+          venv: venvSize,
+          venv_human: formatBytes(venvSize),
+          huggingface: hfCacheSize,
+          huggingface_human: formatBytes(hfCacheSize),
+          grand_total: dataDirSize + hfCacheSize,
+          grand_total_human: formatBytes(dataDirSize + hfCacheSize)
+        }
+      };
+      console.log(JSON.stringify(report, null, 2));
+    } else {
+      console.log("\nVTT Storage Usage");
+      console.log("══════════════════════════════════════════════════\n");
+      
+      // Dependencies
+      console.log("Dependencies:");
+      console.log(`  Python             ${formatBytes(pythonSize).padEnd(12)}  ${pythonPath}`);
+      console.log(`  Sox                ${formatBytes(soxSize).padEnd(12)}  ${soxPath}`);
+      console.log();
+      
+      // Storage directories
+      console.log("Storage Directories:");
+      console.log(`  Data Directory      ${formatBytes(dataDirSize).padEnd(12)}  ${config.dataDir}`);
+      console.log(`    stt/             ${formatBytes(sttSize).padEnd(12)}  (daemon, recordings)`);
+      console.log(`      daemon/        ${formatBytes(sttDaemonSize).padEnd(12)}  (scripts, logs)`);
+      console.log(`      recordings/    ${formatBytes(sttRecordingsSize).padEnd(12)}  (transcription audio)`);
+      console.log(`    tts/             ${formatBytes(ttsSize).padEnd(12)}  (voices, previews, recordings)`);
+      console.log(`      voices/        ${formatBytes(ttsVoicesSize).padEnd(12)}  (downloaded TTS voices)`);
+      console.log(`      previews/      ${formatBytes(ttsPreviewsSize).padEnd(12)}  (voice previews)`);
+      console.log(`      recordings/    ${formatBytes(ttsRecordingsSize).padEnd(12)}  (saved TTS output)`);
+      console.log(`      tmp/           ${formatBytes(ttsTmpSize).padEnd(12)}  (temporary files)`);
+      console.log(`    venv/            ${formatBytes(venvSize).padEnd(12)}  (Python environment)`);
+      console.log(`  HuggingFace       ${formatBytes(hfCacheSize).padEnd(12)}  ${hfCacheDir}`);
+      console.log(`    models/          ${formatBytes(totalModelSize).padEnd(12)}  (STT models)`);
+      console.log();
+
+      // Models
+      console.log("STT Models:");
+      const downloadedModels = modelsInfo.filter(m => m.downloaded);
+      if (downloadedModels.length > 0) {
+        for (const m of downloadedModels) {
+          const displayPath = m.path || "N/A";
+          console.log(`  ${m.alias.padEnd(18)}  ${formatBytes(m.size).padEnd(14)}  ${displayPath}`);
+        }
+      } else {
+        console.log("  (no models downloaded)");
+      }
+      console.log();
+
+      // Voices
+      console.log("TTS Voices:");
+      const downloadedVoices = voicesInfo.filter(v => v.downloaded && v.provider !== "system");
+      if (downloadedVoices.length > 0) {
+        console.log(`  Alias                Provider      Size            Path`);
+        console.log(`  ${"─".repeat(110)}`);
+        for (const v of downloadedVoices) {
+          const displayPath = v.path || "N/A";
+          console.log(`  ${v.alias.padEnd(18)}  ${v.provider.padEnd(13)}  ${formatBytes(v.size).padEnd(14)}  ${displayPath}`);
+        }
+      } else {
+        console.log("  (no voices downloaded)");
+      }
+      console.log();
+
+      // Grand total
+      console.log("═".repeat(60));
+      const grandTotal = dataDirSize + hfCacheSize;
+      console.log(`Total Storage Used: ${formatBytes(grandTotal).padStart(25)}`);
+      console.log("═".repeat(60));
       console.log();
     }
   });
@@ -1623,8 +2074,8 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
   2. List available voices:
      $ vtt voices list
 
-  3. Download a voice:
-     $ vtt voices download Heart
+   3. Download a voice:
+     $ vtt voices download Heart --engine kokoro
 
   4. Transcribe speech:
      $ vtt transcribe
@@ -1643,6 +2094,7 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
   voices        Manage TTS voices
   models        Manage STT models
   server        Manage Kokoro TTS server
+  storage       Show storage usage of dependencies and downloads
   doctor        Check system health and diagnose issues
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1696,31 +2148,36 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
   Speak text directly:
     $ vtt speak "Hello world"
 
-  Use specific voice:
-    $ vtt speak -v Heart "Hello world"
-    $ vtt speak --voice Amy "Hello world"
-    $ vtt speak -v Samantha "Hello world"
+  Use specific voice and engine:
+    $ vtt speak -e kokoro -v Heart "Hello world"
+    $ vtt speak --engine piper --voice Amy "Hello world"
+    $ vtt speak -e system -v Samantha "Hello world"
 
   Control playback speed (0.5-2.0x):
-    $ vtt speak -v Heart --speed 1.5 "Fast speech"
-    $ vtt speak -v Amy --speed 0.8 "Slow and clear"
+    $ vtt speak -e kokoro -v Heart --speed 1.5 "Fast speech"
+    $ vtt speak -e piper -v Amy --speed 0.8 "Slow and clear"
 
   Read from file:
-    $ vtt speak -f document.txt
-    $ vtt speak --file essay.txt -v Heart
+    $ vtt speak -e kokoro -f document.txt
+    $ vtt speak --engine piper --file essay.txt -v Amy
 
   Pipe from stdin (automatically detected):
-    $ echo "Hello world" | vtt speak
-    $ cat script.txt | vtt speak -v Daniel
-    $ ls -la | vtt speak -v Alex
-    $ date | vtt speak
+    $ echo "Hello world" | vtt speak -e kokoro
+    $ cat script.txt | vtt speak -e system -v Daniel
+    $ ls -la | vtt speak -e piper -v Alex
+    $ date | vtt speak -e system
 
   Save to file (don't play):
-    $ vtt speak "Hello" --output greeting.wav
-    $ vtt speak -f input.txt -o output.wav
+    $ vtt speak -e kokoro "Hello" --output greeting.wav
+    $ vtt speak -e piper -f input.txt -o output.wav
 
   Quiet mode:
-    $ vtt speak "Hello" --quiet
+    $ vtt speak -e kokoro "Hello" --quiet
+
+  With environment variables set (no --engine needed):
+    $ export VTT_DEFAULT_TTS_ENGINE=kokoro
+    $ export VTT_DEFAULT_TTS_VOICE=Heart
+    $ vtt speak "Hello world"
 
   Features:
     • Auto-stops any existing playback before starting new audio
@@ -1751,16 +2208,18 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
     (Shows download status for each voice)
 
   Download a voice:
-    $ vtt voices download Heart
-    $ vtt voices download Amy
-    $ vtt voices download Adam
+    $ vtt voices download Heart --engine kokoro
+    $ vtt voices download Amy --engine piper
+    $ vtt voices download Adam --engine kokoro
 
   Delete a voice:
-    $ vtt voices delete Heart
+    $ vtt voices delete Heart --engine kokoro
 
   Preview a voice:
-    $ vtt voices preview Heart
-    $ vtt voices preview Heart --speed 1.2
+    $ vtt voices preview Heart --engine kokoro
+    $ vtt voices preview Amy --engine piper
+    $ vtt voices preview Samantha --engine system
+    $ vtt voices preview Heart --engine kokoro --speed 1.2
 
   Available Voices:
     
@@ -1824,6 +2283,23 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
     $ vtt server stop
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ STORAGE - Storage Usage
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Show storage usage for dependencies, models, and voices:
+    $ vtt storage
+
+  Output as JSON:
+    $ vtt storage --json
+
+  Shows:
+    • Dependency paths and sizes (Python, sox, afplay, say)
+    • Storage directory paths and sizes
+    • Downloaded models with their paths and sizes
+    • Downloaded voices with their paths and sizes
+    • Grand total storage used
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  DOCTOR - System Health
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1855,12 +2331,17 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
     VTT_KOKORO_SOCKET        Unix socket path (default: /tmp/kokoro_tts_<uid>.sock)
     VTT_KOKORO_IDLE_TIMEOUT  Server idle timeout (default: 120)
     VTT_DEFAULT_STT_MODEL    Default model (default: whisper-tiny)
+    VTT_DEFAULT_TTS_ENGINE   Default TTS engine (piper, kokoro, system)
     VTT_DEFAULT_TTS_VOICE    Default voice (default: Samantha)
     VTT_LOG_LEVEL            Log level: debug, info, warn, error (default: info)
+    VTT_ASK_PERMISSION       Prompt before installing engine dependencies (default: true)
+                             Set to 'false' for headless/automated usage
 
   Set in your shell profile:
     export VTT_PYTHON_PATH=/opt/homebrew/bin/python3
+    export VTT_DEFAULT_TTS_ENGINE=kokoro
     export VTT_DEFAULT_TTS_VOICE=Heart
+    export VTT_ASK_PERMISSION=false  # Skip prompts for automated scripts
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  EXIT CODES
@@ -1881,11 +2362,11 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
     $ vtt transcribe --silence-timeout 15 -o meeting.txt
 
   Read document with speed boost:
-    $ vtt speak -f report.txt -v Heart --speed 1.3
+    $ vtt speak -f report.txt -e kokoro -v Heart --speed 1.3
 
   Chain commands (transcribe and read back):
     $ TEXT=$(vtt transcribe --silence-timeout 10 --quiet)
-    $ echo "You said: $TEXT" | vtt speak -v Samantha
+    $ echo "You said: $TEXT" | vtt speak -e system -v Samantha
 
   Script automation:
     #!/bin/bash

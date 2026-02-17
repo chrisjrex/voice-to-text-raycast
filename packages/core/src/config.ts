@@ -15,6 +15,7 @@ export interface Config {
   kokoroSocket: string;
   kokoroIdleTimeout: number;
   defaultSTTModel: string;
+  defaultTTSEngine: string;
   defaultTTSVoice: string;
   logLevel: "debug" | "info" | "warn" | "error";
 }
@@ -27,6 +28,7 @@ const DEFAULT_CONFIG: Config = {
   kokoroSocket: `/tmp/kokoro_tts_${process.getuid?.() ?? 0}.sock`,
   kokoroIdleTimeout: 120,
   defaultSTTModel: "", // No default - model must be specified or set via VTT_DEFAULT_STT_MODEL
+  defaultTTSEngine: "", // No default - engine must be specified or set via VTT_DEFAULT_TTS_ENGINE
   defaultTTSVoice: "Samantha",
   logLevel: "info"
 };
@@ -167,7 +169,11 @@ export function loadConfig(): Config {
   if (process.env.VTT_DEFAULT_STT_MODEL) {
     config.defaultSTTModel = process.env.VTT_DEFAULT_STT_MODEL;
   }
-  
+
+  if (process.env.VTT_DEFAULT_TTS_ENGINE) {
+    config.defaultTTSEngine = process.env.VTT_DEFAULT_TTS_ENGINE;
+  }
+
   if (process.env.VTT_DEFAULT_TTS_VOICE) {
     config.defaultTTSVoice = process.env.VTT_DEFAULT_TTS_VOICE;
   }

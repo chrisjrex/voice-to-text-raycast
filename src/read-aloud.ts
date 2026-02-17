@@ -9,6 +9,7 @@ import {
 import { spawn } from "child_process";
 import {
   existsSync,
+  mkdirSync,
   openSync,
   readFileSync,
   unlinkSync,
@@ -32,105 +33,9 @@ interface Preferences {
 }
 
 const KOKORO_SOCK = `/tmp/kokoro_tts_${process.getuid?.() ?? 0}.sock`;
-const KOKORO_PID = join(environment.supportPath, "kokoro_server.pid");
-const KOKORO_SERVER_SCRIPT = join(environment.supportPath, "kokoro_server.py");
-
-function resolveKokoroPython(prefs: Preferences): string {
-  const raw = prefs.kokoroPythonPath || "~/.local/lib-kokoro/venv/bin/python3";
-  const resolved = raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
-  if (!prefs.kokoroPythonPath && !existsSync(resolved)) return prefs.pythonPath;
-  return resolved;
-}
-
-function buildKokoroServerScript(idleTimeout = 120): string {
-  return `
-import json, os, select, signal, socket, sys, time, numpy as np, soundfile as sf
-from kokoro import KPipeline
-
-SOCK_PATH = ${JSON.stringify(KOKORO_SOCK)}
-PID_PATH = ${JSON.stringify(KOKORO_PID)}
-IDLE_TIMEOUT = ${idleTimeout}
-
-pipelines = {}
-
-def get_pipeline(lang_code):
-    if lang_code not in pipelines:
-        pipelines[lang_code] = KPipeline(lang_code=lang_code)
-    return pipelines[lang_code]
-
-def handle_client(conn):
-    data = b""
-    while True:
-        chunk = conn.recv(4096)
-        if not chunk:
-            return
-        data += chunk
-        if b"\\n" in data:
-            break
-    line = data.split(b"\\n", 1)[0]
-    try:
-        req = json.loads(line)
-        text, voice, output = req["text"], req["voice"], req["output"]
-        pipeline = get_pipeline(voice[0])
-        chunks = [audio for _, _, audio in pipeline(text, voice=voice)]
-        sf.write(output, np.concatenate(chunks), 24000)
-        conn.sendall(b"ok\\n")
-    except Exception as e:
-        conn.sendall(f"error: {e}\\n".encode())
-
-def cleanup(*_):
-    try: os.unlink(SOCK_PATH)
-    except: pass
-    try: os.unlink(PID_PATH)
-    except: pass
-    sys.exit(0)
-
-signal.signal(signal.SIGTERM, cleanup)
-signal.signal(signal.SIGINT, cleanup)
-
-try: os.unlink(SOCK_PATH)
-except: pass
-
-with open(PID_PATH, "w") as f:
-    f.write(str(os.getpid()))
-
-sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-sock.bind(SOCK_PATH)
-sock.listen(1)
-
-last_activity = time.monotonic()
-while True:
-    ready, _, _ = select.select([sock], [], [], 10)
-    if not ready:
-        if time.monotonic() - last_activity >= IDLE_TIMEOUT:
-            cleanup()
-        continue
-    conn, _ = sock.accept()
-    try:
-        handle_client(conn)
-    finally:
-        conn.close()
-    last_activity = time.monotonic()
-`.trimStart();
-}
-
-function isKokoroServerRunning(): Promise<boolean> {
-  if (!existsSync(KOKORO_SOCK)) return Promise.resolve(false);
-  return new Promise((resolve) => {
-    const conn = createConnection(KOKORO_SOCK);
-    conn.on("connect", () => {
-      conn.destroy();
-      resolve(true);
-    });
-    conn.on("error", () => resolve(false));
-    setTimeout(() => {
-      conn.destroy();
-      resolve(false);
-    }, 500);
-  });
-}
-
-const KOKORO_LOG = join(environment.supportPath, "kokoro_server.log");
+const KOKORO_PID = join(environment.supportPath, "tts", "daemon", "kokoro_server.pid");
+const KOKORO_SERVER_SCRIPT = join(environment.supportPath, "tts", "daemon", "kokoro_server.py");
+const KOKORO_LOG = join(environment.supportPath, "tts", "daemon", "kokoro_server.log");
 
 async function startKokoroServer(
   pythonPath: string,
@@ -175,7 +80,7 @@ async function speakWithKokoroServer(
   text: string,
   voice: string,
 ): Promise<void> {
-  const outputPath = join(environment.supportPath, `tts-${Date.now()}.wav`);
+  const outputPath = join(ensureTtsDir(), `${Date.now()}.wav`);
   const v = voice || "af_heart";
   const request = JSON.stringify({ text, voice: v, output: outputPath }) + "\n";
 
@@ -233,7 +138,7 @@ export {
 };
 export type { Preferences as ReadAloudPreferences };
 
-export const PLAYBACK_PID = join(environment.supportPath, "tts_playback.pid");
+export const PLAYBACK_PID = join(environment.supportPath, "tts", "playback.pid");
 
 function isPlaying(): boolean {
   try {
@@ -286,7 +191,7 @@ async function speakWithKokoroColdStart(
   pythonPath: string,
   voice: string,
 ): Promise<void> {
-  const outputPath = join(environment.supportPath, `tts-${Date.now()}.wav`);
+  const outputPath = join(ensureTtsDir(), `${Date.now()}.wav`);
   const v = voice || "af_heart";
   const script = `
 import sys, json, numpy as np, soundfile as sf
@@ -330,7 +235,7 @@ async function speakWithPiper(
   pythonPath: string,
   voiceId: string,
 ): Promise<void> {
-  const outputPath = join(environment.supportPath, `tts-${Date.now()}.wav`);
+  const outputPath = join(ensureTtsDir(), `${Date.now()}.wav`);
   const dataDir = ttsVoicesDir();
 
   await new Promise<void>((resolve, reject) => {
