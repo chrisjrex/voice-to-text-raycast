@@ -3,8 +3,11 @@ class VttLite < Formula
   homepage "https://github.com/chrisjrex/voice-to-text-raycast"
   version "1.0.0"
   
+  # For local testing, use --build-from-source flag
+  # To update SHA256: shasum -a 256 <file>
+  
   url "https://registry.npmjs.org/@vtt/cli-lite/-/cli-lite-1.0.0.tgz"
-  sha256 "PLACEHOLDER_SHA256"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   
   license "MIT"
   
@@ -25,6 +28,12 @@ class VttLite < Formula
       check_pkg() {
         $PYTHON -c "import $1" 2>/dev/null
       }
+      
+      # Auto-install prettytable if missing (required for 'vtt storage')
+      if ! check_pkg prettytable; then
+        echo "Installing prettytable (required for 'vtt storage')..."
+        pip3 install prettytable
+      fi
       
       # Warn if packages not installed
       if ! check_pkg mlx_whisper && ! check_pkg parakeet_mlx; then
@@ -58,7 +67,7 @@ class VttLite < Formula
     <<~EOS
       VTT Lite has been installed!
       
-      ⚠️  IMPORTANT: You need to install Python packages manually:
+      IMPORTANT: Required Python packages are installed automatically.
       
       Speech-to-Text (pick one or both):
         pip3 install mlx-whisper      # Multilingual
@@ -66,6 +75,7 @@ class VttLite < Formula
       
       Text-to-Speech (optional):
         pip3 install piper-tts        # Lightweight TTS
+        pip3 install prettytable       # Required for 'vtt storage' command
       
       Kokoro TTS (optional, requires Python 3.11):
         python3.11 -m venv ~/.local/lib-kokoro/venv

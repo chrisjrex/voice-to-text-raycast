@@ -3,13 +3,16 @@ class Vtt < Formula
   homepage "https://github.com/chrisjrex/voice-to-text-raycast"
   version "1.0.0"
   
+  # For local testing, use --build-from-source flag
+  # To update SHA256: shasum -a 256 <file>
+  
   # Download architecture-specific runtime
   if Hardware::CPU.arm?
     url "https://github.com/chrisjrex/voice-to-text-raycast/releases/download/v1.0.0/vtt-runtime-3.11.9-macos-arm64.tar.gz"
-    sha256 "PLACEHOLDER_SHA256_ARM64"
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   else
     url "https://github.com/chrisjrex/voice-to-text-raycast/releases/download/v1.0.0/vtt-runtime-3.11.9-macos-x86_64.tar.gz"
-    sha256 "PLACEHOLDER_SHA256_X86_64"
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   end
   
   license "MIT"
@@ -18,7 +21,7 @@ class Vtt < Formula
   
   resource "vtt-cli" do
     url "https://registry.npmjs.org/@vtt/cli/-/cli-1.0.0.tgz"
-    sha256 "PLACEHOLDER_NPM_SHA256"
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   end
   
   def install

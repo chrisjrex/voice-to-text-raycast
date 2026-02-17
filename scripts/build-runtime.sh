@@ -126,6 +126,9 @@ pip install piper-tts
 log "Installing kokoro and dependencies..."
 pip install kokoro soundfile numpy scipy torch transformers
 
+log "Installing prettytable..."
+pip install prettytable
+
 # Strip unnecessary files from packages
 log "Optimizing package size..."
 find "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/site-packages" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

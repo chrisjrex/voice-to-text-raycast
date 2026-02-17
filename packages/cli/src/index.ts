@@ -1987,65 +1987,116 @@ program
       };
       console.log(JSON.stringify(report, null, 2));
     } else {
-      console.log("\nVTT Storage Usage");
-      console.log("══════════════════════════════════════════════════\n");
-      
-      // Dependencies
-      console.log("Dependencies:");
-      console.log(`  Python             ${formatBytes(pythonSize).padEnd(12)}  ${pythonPath}`);
-      console.log(`  Sox                ${formatBytes(soxSize).padEnd(12)}  ${soxPath}`);
-      console.log();
-      
-      // Storage directories
-      console.log("Storage Directories:");
-      console.log(`  Data Directory      ${formatBytes(dataDirSize).padEnd(12)}  ${config.dataDir}`);
-      console.log(`    stt/             ${formatBytes(sttSize).padEnd(12)}  (daemon, recordings)`);
-      console.log(`      daemon/        ${formatBytes(sttDaemonSize).padEnd(12)}  (scripts, logs)`);
-      console.log(`      recordings/    ${formatBytes(sttRecordingsSize).padEnd(12)}  (transcription audio)`);
-      console.log(`    tts/             ${formatBytes(ttsSize).padEnd(12)}  (voices, previews, recordings)`);
-      console.log(`      voices/        ${formatBytes(ttsVoicesSize).padEnd(12)}  (downloaded TTS voices)`);
-      console.log(`      previews/      ${formatBytes(ttsPreviewsSize).padEnd(12)}  (voice previews)`);
-      console.log(`      recordings/    ${formatBytes(ttsRecordingsSize).padEnd(12)}  (saved TTS output)`);
-      console.log(`      tmp/           ${formatBytes(ttsTmpSize).padEnd(12)}  (temporary files)`);
-      console.log(`    venv/            ${formatBytes(venvSize).padEnd(12)}  (Python environment)`);
-      console.log(`  HuggingFace       ${formatBytes(hfCacheSize).padEnd(12)}  ${hfCacheDir}`);
-      console.log(`    models/          ${formatBytes(totalModelSize).padEnd(12)}  (STT models)`);
-      console.log();
-
-      // Models
-      console.log("STT Models:");
-      const downloadedModels = modelsInfo.filter(m => m.downloaded);
-      if (downloadedModels.length > 0) {
-        for (const m of downloadedModels) {
-          const displayPath = m.path || "N/A";
-          console.log(`  ${m.alias.padEnd(18)}  ${formatBytes(m.size).padEnd(14)}  ${displayPath}`);
+      const report = {
+        timestamp: new Date().toISOString(),
+        dependencies: {
+          python: {
+            path: pythonPath,
+            size: pythonSize,
+            size_human: formatBytes(pythonSize)
+          },
+          sox: {
+            path: soxPath,
+            size: soxSize,
+            size_human: formatBytes(soxSize)
+          },
+          total_size: totalDependencySize,
+          total_size_human: formatBytes(totalDependencySize)
+        },
+        storage: {
+          data_dir: {
+            path: config.dataDir,
+            size: dataDirSize,
+            size_human: formatBytes(dataDirSize),
+            stt: {
+              size: sttSize,
+              size_human: formatBytes(sttSize),
+              daemon: { size: sttDaemonSize, size_human: formatBytes(sttDaemonSize) },
+              recordings: { size: sttRecordingsSize, size_human: formatBytes(sttRecordingsSize) }
+            },
+            tts: {
+              size: ttsSize,
+              size_human: formatBytes(ttsSize),
+              voices: { size: ttsVoicesSize, size_human: formatBytes(ttsVoicesSize) },
+              previews: { size: ttsPreviewsSize, size_human: formatBytes(ttsPreviewsSize) },
+              recordings: { size: ttsRecordingsSize, size_human: formatBytes(ttsRecordingsSize) },
+              tmp: { size: ttsTmpSize, size_human: formatBytes(ttsTmpSize) }
+            },
+            venv: { size: venvSize, size_human: formatBytes(venvSize) }
+          },
+          huggingface_cache: {
+            path: hfCacheDir,
+            size: hfCacheSize,
+            size_human: formatBytes(hfCacheSize),
+            models: { size: totalModelSize, size_human: formatBytes(totalModelSize) }
+          }
+        },
+        models: {
+          items: modelsInfo.map(m => ({
+            alias: m.alias,
+            id: m.id,
+            provider: m.provider,
+            downloaded: m.downloaded,
+            path: m.path,
+            size: m.size,
+            size_human: formatBytes(m.size)
+          })),
+          total_size: totalModelSize,
+          total_size_human: formatBytes(totalModelSize),
+          downloaded_count: modelsInfo.filter(m => m.downloaded).length
+        },
+        voices: {
+          items: voicesInfo.map(v => ({
+            alias: v.alias,
+            provider: v.provider,
+            downloaded: v.downloaded,
+            path: v.path,
+            size: v.size,
+            size_human: formatBytes(v.size)
+          })),
+          total_size: totalVoiceSize,
+          total_size_human: formatBytes(totalVoiceSize),
+          downloaded_count: voicesInfo.filter(v => v.downloaded && v.provider !== "system").length
+        },
+        totals: {
+          stt: sttSize,
+          stt_human: formatBytes(sttSize),
+          stt_daemon: sttDaemonSize,
+          stt_daemon_human: formatBytes(sttDaemonSize),
+          stt_recordings: sttRecordingsSize,
+          stt_recordings_human: formatBytes(sttRecordingsSize),
+          tts: ttsSize,
+          tts_human: formatBytes(ttsSize),
+          tts_voices: ttsVoicesSize,
+          tts_voices_human: formatBytes(ttsVoicesSize),
+          tts_previews: ttsPreviewsSize,
+          tts_previews_human: formatBytes(ttsPreviewsSize),
+          tts_recordings: ttsRecordingsSize,
+          tts_recordings_human: formatBytes(ttsRecordingsSize),
+          tts_tmp: ttsTmpSize,
+          tts_tmp_human: formatBytes(ttsTmpSize),
+          venv: venvSize,
+          venv_human: formatBytes(venvSize),
+          huggingface: hfCacheSize,
+          huggingface_human: formatBytes(hfCacheSize),
+          grand_total: dataDirSize + hfCacheSize,
+          grand_total_human: formatBytes(dataDirSize + hfCacheSize)
         }
-      } else {
-        console.log("  (no models downloaded)");
-      }
-      console.log();
+      };
 
-      // Voices
-      console.log("TTS Voices:");
-      const downloadedVoices = voicesInfo.filter(v => v.downloaded && v.provider !== "system");
-      if (downloadedVoices.length > 0) {
-        console.log(`  Alias                Provider      Size            Path`);
-        console.log(`  ${"─".repeat(110)}`);
-        for (const v of downloadedVoices) {
-          const displayPath = v.path || "N/A";
-          console.log(`  ${v.alias.padEnd(18)}  ${v.provider.padEnd(13)}  ${formatBytes(v.size).padEnd(14)}  ${displayPath}`);
-        }
-      } else {
-        console.log("  (no voices downloaded)");
+      const { execSync } = require("child_process");
+      const scriptPath = join(config.dataDir, "format-storage-table.py");
+      try {
+        const output = execSync(`"${config.pythonPath}" "${scriptPath}"`, {
+          input: JSON.stringify(report),
+          encoding: "utf-8",
+          timeout: 30000
+        });
+        console.log(output);
+      } catch (error) {
+        console.error("Error formatting storage output:", (error as Error).message);
+        console.log(JSON.stringify(report, null, 2));
       }
-      console.log();
-
-      // Grand total
-      console.log("═".repeat(60));
-      const grandTotal = dataDirSize + hfCacheSize;
-      console.log(`Total Storage Used: ${formatBytes(grandTotal).padStart(25)}`);
-      console.log("═".repeat(60));
-      console.log();
     }
   });
 
