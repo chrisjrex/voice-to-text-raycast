@@ -12,12 +12,8 @@ on:
       - 'runtime-v*'
 
 jobs:
-  build-macos:
+  build-macos-arm64:
     runs-on: macos-latest
-    strategy:
-      matrix:
-        arch: [arm64, x86_64]
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -29,19 +25,17 @@ jobs:
     
     - name: Install dependencies
       run: |
-        brew install pkg-config libtool
+        brew install pkg-config libtool sox
     
     - name: Build runtime
       run: |
-        export PYTHON_VERSION=${{ github.event.inputs.python_version || '3.11.9' }}
+        export PYTHON_VERSION=${{ github.event.inputs.python_version || '3.11.9 }}
         ./scripts/build-runtime.sh
-      env:
-        ARCH: ${{ matrix.arch }}
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: vtt-runtime-macos-${{ matrix.arch }}
+        name: vtt-runtime-macos-arm64
         path: vtt-runtime-*.tar.gz
         retention-days: 30
     
@@ -54,7 +48,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   create-release:
-    needs: build-macos
+    needs: build-macos-arm64
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     
@@ -80,6 +74,7 @@ jobs:
           - piper-tts (TTS)
           - kokoro (TTS)
           - soundfile, numpy, scipy, torch, transformers
+          - prettytable
         - Static sox binary
 
         ## Usage
@@ -95,7 +90,6 @@ jobs:
 
         ## Architectures
         - arm64: Apple Silicon (M1/M2/M3)
-        - x86_64: Intel Macs
 
         ## Size
         - Download: ~45-50MB (compressed)

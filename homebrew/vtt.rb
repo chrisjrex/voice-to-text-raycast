@@ -6,13 +6,16 @@ class Vtt < Formula
   # For local testing, use --build-from-source flag
   # To update SHA256: shasum -a 256 <file>
   
-  # Download architecture-specific runtime
-  if Hardware::CPU.arm?
-    url "https://github.com/chrisjrex/voice-to-text-raycast/releases/download/v1.0.0/vtt-runtime-3.11.9-macos-arm64.tar.gz"
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-  else
-    url "https://github.com/chrisjrex/voice-to-text-raycast/releases/download/v1.0.0/vtt-runtime-3.11.9-macos-x86_64.tar.gz"
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  # Apple Silicon only (bundled runtime)
+  on_macos do
+    on_arm do
+      url "https://github.com/chrisjrex/voice-to-text-raycast/releases/download/v1.0.0/vtt-runtime-3.11.9-macos-arm64.tar.gz"
+      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    end
+    on_intel do
+      # Intel users should use vtt-lite
+      disable! because: "requires Apple Silicon. Use 'brew install vtt-lite' for Intel Macs."
+    end
   end
   
   license "MIT"
