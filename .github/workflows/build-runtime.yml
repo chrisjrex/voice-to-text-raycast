@@ -29,7 +29,7 @@ jobs:
     
     - name: Build runtime
       run: |
-        export PYTHON_VERSION=${{ github.event.inputs.python_version || '3.11.9 }}
+        export PYTHON_VERSION="${{ github.event.inputs.python_version || '3.11.9' }}"
         ./scripts/build-runtime.sh
     
     - name: Upload artifact
