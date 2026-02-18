@@ -2,23 +2,29 @@ class VttLite < Formula
   desc "Voice-to-Text CLI tool (lite version - requires system dependencies)"
   homepage "https://github.com/chrisjrex/voice-to-text-raycast"
   version "1.0.0"
-  
-  # For local testing, use --build-from-source flag
-  # To update SHA256: shasum -a 256 <file>
-  
-  url "https://registry.npmjs.org/@vtt/cli-lite/-/cli-lite-#{version}.tgz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-  
   license "MIT"
+  
+  # Install from GitHub release
+  on_macos do
+    url "https://github.com/chrisjrex/voice-to-text-raycast/archive/refs/tags/v#{version}.tar.gz"
+    sha256 "27b4d0ba80dade4aa155a154a07075ac1ff3c86b8edf959085423ccaf792fd32"
+  end
   
   depends_on "node"
   depends_on "sox"
   depends_on "python@3.11"
   
   def install
-    system "npm", "install", "-g", "@vtt/cli-lite@#{version}", "--prefix", libexec
+    # Build the packages
+    cd "packages" do
+      system "npm", "install"
+      system "npm", "run", "build"
+    end
     
-    # Create wrapper that checks dependencies
+    # Install CLI globally to libexec
+    system "npm", "install", "-g", "./packages/cli", "--prefix", libexec
+    
+    # Create wrapper that sets Python path
     (bin/"vtt").write <<~EOS
       #!/bin/bash
       
@@ -53,6 +59,7 @@ class VttLite < Formula
         echo ""
       fi
       
+      export VTT_PYTHON_PATH="$PYTHON"
       exec "#{libexec}/bin/vtt" "$@"
     EOS
     chmod 0755, bin/"vtt"
