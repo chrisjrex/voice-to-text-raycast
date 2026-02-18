@@ -2378,7 +2378,7 @@ program
       };
 
       const { execSync } = require("child_process");
-      const scriptPath = join(config.dataDir, "format-storage-table.py");
+      const scriptPath = join(__dirname, "..", "assets", "format-storage-table.py");
       try {
         const output = execSync(`"${config.pythonPath}" "${scriptPath}"`, {
           input: JSON.stringify(report),
