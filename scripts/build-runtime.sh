@@ -59,26 +59,29 @@ fi
 log "Extracting Python..."
 pkgutil --expand-full "$PYTHON_PKG" python_pkg_extracted
 
-# Find the Python framework
-PYTHON_FRAMEWORK=$(find python_pkg_extracted -name "Python" -type d | head -1)
+# Find the Python framework payload
+PYTHON_FRAMEWORK=$(find python_pkg_extracted -path "*/Python_Framework.pkg/Payload" -type d | head -1)
 if [ -z "$PYTHON_FRAMEWORK" ]; then
-    error "Could not find Python framework in package"
+    error "Could not find Python framework in package. Checking structure..."
+    find python_pkg_extracted -type d -name "*Framework*" 2>/dev/null || true
+    exit 1
 fi
 
 # Copy Python to runtime directory
-log "Copying Python framework..."
+log "Copying Python framework from $PYTHON_FRAMEWORK..."
 cp -R "$PYTHON_FRAMEWORK" "$RUNTIME_DIR/Python"
 
 # Create bin directory structure
 mkdir -p "$RUNTIME_DIR/bin"
 
-# Create symlinks for python executables
-ln -sf "../Python/bin/python${PYTHON_SHORT}" "$RUNTIME_DIR/bin/python3"
+# Create symlinks for python executables (Python framework stores binaries in Versions/X.Y/bin)
+PYTHON_BIN="$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/bin"
+ln -sf "../Python/Versions/${PYTHON_SHORT}/bin/python${PYTHON_SHORT}" "$RUNTIME_DIR/bin/python3"
 ln -sf "python3" "$RUNTIME_DIR/bin/python"
 
-# Copy pip
-if [ -f "$RUNTIME_DIR/Python/bin/pip${PYTHON_SHORT}" ]; then
-    cp "$RUNTIME_DIR/Python/bin/pip${PYTHON_SHORT}" "$RUNTIME_DIR/bin/pip3"
+# Copy pip if it exists (it's installed separately by the installer)
+if [ -f "$PYTHON_BIN/pip${PYTHON_SHORT}" ]; then
+    cp "$PYTHON_BIN/pip${PYTHON_SHORT}" "$RUNTIME_DIR/bin/pip3"
     ln -sf "pip3" "$RUNTIME_DIR/bin/pip"
 fi
 
@@ -86,25 +89,25 @@ fi
 log "Cleaning up unnecessary files..."
 
 # Remove test suite
-rm -rf "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/test"
-rm -rf "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/lib2to3/tests"
+rm -rf "$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/lib/python${PYTHON_SHORT}/test"
+rm -rf "$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/lib/python${PYTHON_SHORT}/lib2to3/tests"
 
 # Remove IDLE and tkinter (not needed for CLI)
-rm -rf "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/idlelib"
-rm -rf "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/tkinter"
-rm -rf "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/turtledemo"
+rm -rf "$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/lib/python${PYTHON_SHORT}/idlelib"
+rm -rf "$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/lib/python${PYTHON_SHORT}/tkinter"
+rm -rf "$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/lib/python${PYTHON_SHORT}/turtledemo"
 
 # Remove documentation
-rm -rf "$RUNTIME_DIR/Python/share/doc"
-rm -rf "$RUNTIME_DIR/Python/share/man"
+rm -rf "$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/share/doc"
+rm -rf "$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/share/man"
 
 # Remove development files
-rm -rf "$RUNTIME_DIR/Python/include"
-rm -f "$RUNTIME_DIR/Python/lib/libpython*.a"
+rm -rf "$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/include"
+rm -f "$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/lib/libpython*.a"
 
 # Remove unnecessary binaries
-rm -f "$RUNTIME_DIR/Python/bin/idle"*
-rm -f "$RUNTIME_DIR/Python/bin/python${PYTHON_SHORT}-config"
+rm -f "$PYTHON_BIN/idle"*
+rm -f "$PYTHON_BIN/python${PYTHON_SHORT}-config"
 
 # Install required packages
 log "Installing Python packages..."
@@ -131,13 +134,14 @@ pip install prettytable
 
 # Strip unnecessary files from packages
 log "Optimizing package size..."
-find "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/site-packages" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-find "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/site-packages" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
-find "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/site-packages" -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+SITE_PACKAGES="$RUNTIME_DIR/Python/Versions/${PYTHON_SHORT}/lib/python${PYTHON_SHORT}/site-packages"
+find "$SITE_PACKAGES" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "$SITE_PACKAGES" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
+find "$SITE_PACKAGES" -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
 # Remove unnecessary test files from packages
-find "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/site-packages" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
-find "$RUNTIME_DIR/Python/lib/python${PYTHON_SHORT}/site-packages" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+find "$SITE_PACKAGES" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+find "$SITE_PACKAGES" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
 
 # Download and build static sox binary
 log "Building static sox binary..."
