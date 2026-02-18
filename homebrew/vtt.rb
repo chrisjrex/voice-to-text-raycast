@@ -21,6 +21,7 @@ class Vtt < Formula
   license "MIT"
   
   depends_on "node"
+  depends_on "sox"
   
   def install
     # Install runtime to libexec/runtime
@@ -33,7 +34,6 @@ class Vtt < Formula
     (bin/"vtt").write <<~EOS
       #!/bin/bash
       export VTT_PYTHON_PATH="#{libexec}/runtime/bin/python3"
-      export VTT_SOX_PATH="#{libexec}/runtime/bin/sox"
       exec "#{libexec}/bin/vtt" "$@"
     EOS
     chmod 0755, bin/"vtt"
@@ -54,8 +54,7 @@ class Vtt < Formula
       VTT (bundled) has been installed!
       
       This version includes:
-      - Python 3.11 runtime with all required packages
-      - sox binary for audio recording
+      - Python 3.11 runtime with all required packages (mlx-whisper, parakeet-mlx, piper-tts, kokoro)
       
       Quick start:
         vtt doctor              # Check installation

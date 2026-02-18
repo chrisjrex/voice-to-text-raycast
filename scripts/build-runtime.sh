@@ -143,43 +143,7 @@ find "$SITE_PACKAGES" -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null |
 find "$SITE_PACKAGES" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
 find "$SITE_PACKAGES" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
 
-# Download and build static sox binary
-log "Building static sox binary..."
-SOX_VERSION="14.4.2"
-SOX_DIR="$BUILD_DIR/sox-${SOX_VERSION}"
-
-if [ ! -d "$SOX_DIR" ]; then
-    curl -L "https://sourceforge.net/projects/sox/files/sox/${SOX_VERSION}/sox-${SOX_VERSION}.tar.gz/download" -o "sox-${SOX_VERSION}.tar.gz"
-    tar xzf "sox-${SOX_VERSION}.tar.gz"
-fi
-
-cd "$SOX_DIR"
-
-# Configure with static linking
-./configure \
-    --prefix="$RUNTIME_DIR" \
-    --disable-shared \
-    --enable-static \
-    --without-ao \
-    --without-pulseaudio \
-    --without-alsa \
-    --without-oss \
-    --without-coreaudio \
-    --with-ltdl \
-    --disable-symlinks \
-    CFLAGS="-arch $ARCH" \
-    LDFLAGS="-arch $ARCH"
-
-make -j$(sysctl -n hw.ncpu)
-make install
-
-cd "$BUILD_DIR"
-
-# Copy sox binary to bin directory
-cp "$RUNTIME_DIR/bin/sox" "$RUNTIME_DIR/bin/sox.tmp"
-rm -rf "$RUNTIME_DIR/share"
-rm -rf "$RUNTIME_DIR/lib/pkgconfig"
-mv "$RUNTIME_DIR/bin/sox.tmp" "$RUNTIME_DIR/bin/sox"
+log "Skipping sox bundling - using Homebrew's sox instead"
 
 # Create tarball
 log "Creating distribution tarball..."
