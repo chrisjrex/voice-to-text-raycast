@@ -10,7 +10,7 @@ class Vtt < Formula
   on_macos do
     on_arm do
       url "https://github.com/chrisjrex/voice-to-text-raycast/releases/download/v1.0.0/vtt-runtime-3.11.9-macos-arm64.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      sha256 "621bf0363557b0e2e144c016e6494849a330a6d6e66f90d530adc3467748cb98"
     end
     on_intel do
       # Intel users should use vtt-lite
