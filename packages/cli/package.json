@@ -12,9 +12,24 @@
   ],
   "scripts": {
     "build": "tsc",
+    "build:binary": "npm run build && npm run build:bundle-runtime && pkg . --out-path=bin",
+    "build:bundle-runtime": "node scripts/bundle-runtime.js",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "lint": "eslint src/**/*.ts"
+  },
+  "pkg": {
+    "scripts": [
+      "dist/**/*.js"
+    ],
+    "assets": [
+      "assets/**/*",
+      "dist/runtime.tar.gz"
+    ],
+    "targets": [
+      "node18-macos-arm64"
+    ],
+    "outputPath": "bin"
   },
   "keywords": [
     "voice",
@@ -33,6 +48,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
+    "pkg": "^5.8.1",
     "typescript": "^5.7.3"
   },
   "engines": {

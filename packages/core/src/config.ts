@@ -48,11 +48,13 @@ function parseIntOrDefault(value: string | undefined, defaultValue: number): num
 
 /**
  * Get the bundled runtime path if it exists
- * Checks for bundled Python in the package assets
+ * Checks for bundled Python in the package assets or extracted location
  */
 function getBundledPythonPath(): string | undefined {
   // Check multiple possible locations for bundled runtime
   const possiblePaths = [
+    // Extracted runtime location (from standalone binary)
+    join(homedir(), ".local", "share", "vtt", "runtime", "bin", "python3"),
     // From installed npm package
     join(__dirname, "../../../assets/runtime/bin/python3"),
     // From development environment
@@ -74,6 +76,8 @@ function getBundledPythonPath(): string | undefined {
  */
 function getBundledSoxPath(): string | undefined {
   const possiblePaths = [
+    // Extracted runtime location (from standalone binary)
+    join(homedir(), ".local", "share", "vtt", "runtime", "bin", "sox"),
     join(__dirname, "../../../assets/runtime/bin/sox"),
     join(__dirname, "../../cli/assets/runtime/bin/sox"),
     join(process.cwd(), "assets/runtime/bin/sox"),

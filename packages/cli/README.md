@@ -27,13 +27,20 @@ brew tap chrisjrex/vtt
 brew install vtt
 ```
 
-### GitHub Releases
+### Install Script
 
-Download pre-built binary:
+For a manual installation without npm:
 
 ```bash
-curl -sSL https://github.com/chrisjrex/voice-to-text-raycast/releases/download/v1.0.0/vtt-macos-arm64.tar.gz | tar xz
-sudo mv vtt /usr/local/bin/
+curl -sSL https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main/scripts/install.sh | bash
+```
+
+Or download the install script and run it:
+
+```bash
+curl -sSL -o install-vtt.sh https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main/scripts/install.sh
+chmod +x install-vtt.sh
+./install-vtt.sh
 ```
 
 ## Quick Start
