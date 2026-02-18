@@ -6,20 +6,24 @@
 
 import { Command } from "commander";
 import { readFileSync, existsSync, statSync, unlinkSync, readdirSync, rmdirSync, mkdirSync } from "fs";
-import { loadConfig, log, getRuntimeInfo } from "../../core/dist/index.js";
-import { getVoiceByAlias, getVoiceByAliasAndEngine, listAllVoices, getModelByAlias, listAllModels } from "../../core/dist/index.js";
-import { getTTSEngine, SystemTTSEngine } from "../../core/dist/index.js";
-import { getSTTEngine, isSoxAvailable } from "../../core/dist/index.js";
-import { 
-  playAudio, 
-  recordAudio, 
+import {
+  loadConfig,
+  log,
+  getRuntimeInfo,
+  getVoiceByAlias,
+  getVoiceByAliasAndEngine,
+  listAllVoices,
+  getModelByAlias,
+  listAllModels,
+  getTTSEngine,
+  getSTTEngine,
+  isSoxAvailable,
+  SystemTTSEngine,
+  playAudio,
+  recordAudio,
   stopCurrentPlayback,
   isPlaybackActive,
   getPlaybackPid,
-  type RecordingResult,
-  ExitCodes
-} from "../../core/dist/index.js";
-import {
   installLaunchAgent,
   uninstallLaunchAgent,
   startLaunchAgent,
@@ -27,8 +31,10 @@ import {
   isLaunchAgentRunning,
   getLaunchAgentStatus,
   isLaunchAgentInstalled,
-  type LaunchAgentConfig
-} from "../../core/dist/index.js";
+  type RecordingResult,
+  type LaunchAgentConfig,
+  ExitCodes
+} from "@vtt/core";
 import { join, dirname } from "path";
 
 let spinnerInterval: NodeJS.Timeout | null = null;
@@ -817,7 +823,7 @@ import subprocess
 
 try:
     import setproctitle
-    setproctitle.setproctitle("voiceToText")
+    setproctitle.setproctitle("voiceToText-Transcribe")
 except ImportError:
     pass
 

@@ -24,7 +24,7 @@
   "author": "rex",
   "license": "MIT",
   "dependencies": {
-    "@vtt/core": "file:../core",
+    "@vtt/core": "^1.0.0",
     "commander": "^12.0.0",
     "terminal-table": "^0.0.12"
   },

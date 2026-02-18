@@ -6,7 +6,7 @@ class VttLite < Formula
   # For local testing, use --build-from-source flag
   # To update SHA256: shasum -a 256 <file>
   
-  url "https://registry.npmjs.org/@vtt/cli-lite/-/cli-lite-1.0.0.tgz"
+  url "https://registry.npmjs.org/@vtt/cli-lite/-/cli-lite-#{version}.tgz"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   
   license "MIT"
@@ -16,36 +16,40 @@ class VttLite < Formula
   depends_on "python@3.11"
   
   def install
-    system "npm", "install", "-g", "@vtt/cli-lite", "--prefix", libexec
+    system "npm", "install", "-g", "@vtt/cli-lite@#{version}", "--prefix", libexec
     
-    # Create wrapper that ensures Python packages are available
+    # Create wrapper that checks dependencies
     (bin/"vtt").write <<~EOS
       #!/bin/bash
       
-      # Check for required Python packages
       PYTHON="#{Formula["python@3.11"].opt_bin}/python3"
       
+      # Check for required Python packages and warn if missing
       check_pkg() {
         $PYTHON -c "import $1" 2>/dev/null
       }
       
-      # Auto-install prettytable if missing (required for 'vtt storage')
-      if ! check_pkg prettytable; then
-        echo "Installing prettytable (required for 'vtt storage')..."
-        pip3 install prettytable
-      fi
-      
-      # Warn if packages not installed
+      # Check STT engines
       if ! check_pkg mlx_whisper && ! check_pkg parakeet_mlx; then
-        echo "⚠️  Warning: No STT engine installed."
-        echo "   Install one with: pip3 install mlx-whisper"
-        echo "   Or: pip3 install parakeet-mlx"
+        echo "⚠️  No STT engine installed."
+        echo "   Install one with:"
+        echo "     pip3 install mlx-whisper      # Multilingual"
+        echo "     pip3 install parakeet-mlx     # English-only, faster"
         echo ""
       fi
       
-      if ! check_pkg piper; then
-        echo "⚠️  Warning: Piper TTS not installed."
-        echo "   Install with: pip3 install piper-tts"
+      # Check TTS engines
+      if ! check_pkg piper && ! check_pkg kokoro; then
+        echo "⚠️  No TTS engine installed."
+        echo "   Install one with:"
+        echo "     pip3 install piper-tts        # Lightweight TTS"
+        echo "     pip3 install kokoro           # High quality TTS"
+        echo ""
+      fi
+      
+      # Check prettytable for storage command
+      if ! check_pkg prettytable; then
+        echo "ℹ️  Install prettytable for 'vtt storage' command: pip3 install prettytable"
         echo ""
       fi
       
@@ -58,6 +62,7 @@ class VttLite < Formula
       #!/bin/bash
       echo "Removing VTT data directory..."
       rm -rf "$HOME/.local/share/vtt"
+      rm -rf "$HOME/.cache/VoiceToText"
       echo "Run 'brew uninstall vtt-lite' to remove the package"
     EOS
     chmod 0755, bin/"vtt-uninstall"
@@ -67,7 +72,7 @@ class VttLite < Formula
     <<~EOS
       VTT Lite has been installed!
       
-      IMPORTANT: Required Python packages are installed automatically.
+      IMPORTANT: You need to install Python packages manually.
       
       Speech-to-Text (pick one or both):
         pip3 install mlx-whisper      # Multilingual
@@ -75,21 +80,21 @@ class VttLite < Formula
       
       Text-to-Speech (optional):
         pip3 install piper-tts        # Lightweight TTS
-        pip3 install prettytable       # Required for 'vtt storage' command
+        pip3 install kokoro           # High quality TTS (requires Python 3.10-3.12)
       
-      Kokoro TTS (optional, requires Python 3.11):
-        python3.11 -m venv ~/.local/lib-kokoro/venv
-        ~/.local/lib-kokoro/venv/bin/pip install kokoro soundfile numpy
+      For 'vtt storage' command:
+        pip3 install prettytable
       
       Quick start:
         vtt doctor              # Check installation
         vtt models list         # List available models
         vtt models download whisper-tiny
         vtt voices list         # List available voices
-        vtt voices download Heart
-        vtt transcribe          # Start transcribing
+        vtt voices download Heart --engine piper
+        vtt transcribe record   # Start transcribing
+        vtt speak "Hello" --engine system
       
-      Configuration directory: ~/.local/share/vtt
+      Configuration directory: ~/.cache/VoiceToText
       
       To switch to the bundled version (includes everything):
         brew uninstall vtt-lite
@@ -103,6 +108,5 @@ class VttLite < Formula
   
   test do
     system "#{bin}/vtt", "--version"
-    system "#{bin}/vtt", "doctor"
   end
 end

@@ -1,0 +1,16 @@
+{
+  "name": "vtt-packages",
+  "private": true,
+  "workspaces": [
+    "core",
+    "cli",
+    "cli-lite"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=@vtt/core && npm run build --workspace=@vtt/cli",
+    "build:core": "npm run build --workspace=@vtt/core",
+    "build:cli": "npm run build --workspace=@vtt/cli",
+    "build:cli-lite": "npm run build --workspace=@vtt/cli-lite",
+    "test": "npm test --workspace=@vtt/core"
+  }
+}

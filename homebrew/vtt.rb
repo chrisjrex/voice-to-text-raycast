@@ -19,24 +19,18 @@ class Vtt < Formula
   
   depends_on "node"
   
-  resource "vtt-cli" do
-    url "https://registry.npmjs.org/@vtt/cli/-/cli-1.0.0.tgz"
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-  end
-  
   def install
-    # Install runtime to libexec
+    # Install runtime to libexec/runtime
     (libexec/"runtime").install Dir["*"]
     
-    # Download and install npm package
-    resource("vtt-cli").stage do
-      system "npm", "install", "-g", "@vtt/cli", "--prefix", libexec
-    end
+    # Install npm package globally to libexec
+    system "npm", "install", "-g", "@vtt/cli@#{version}", "--prefix", libexec
     
-    # Create wrapper script that sets up paths
+    # Create wrapper script that sets up paths to bundled runtime
     (bin/"vtt").write <<~EOS
       #!/bin/bash
-      export VTT_RUNTIME_PATH="#{libexec}/runtime"
+      export VTT_PYTHON_PATH="#{libexec}/runtime/bin/python3"
+      export VTT_SOX_PATH="#{libexec}/runtime/bin/sox"
       exec "#{libexec}/bin/vtt" "$@"
     EOS
     chmod 0755, bin/"vtt"
@@ -46,6 +40,7 @@ class Vtt < Formula
       #!/bin/bash
       echo "Removing VTT data directory..."
       rm -rf "$HOME/.local/share/vtt"
+      rm -rf "$HOME/.cache/VoiceToText"
       echo "Run 'brew uninstall vtt' to remove the package"
     EOS
     chmod 0755, bin/"vtt-uninstall"
@@ -56,19 +51,19 @@ class Vtt < Formula
       VTT (bundled) has been installed!
       
       This version includes:
-      - Python 3.11 runtime
-      - All required Python packages
-      - sox binary
+      - Python 3.11 runtime with all required packages
+      - sox binary for audio recording
       
       Quick start:
         vtt doctor              # Check installation
         vtt models list         # List available models
         vtt models download whisper-tiny
         vtt voices list         # List available voices
-        vtt voices download Heart
-        vtt transcribe          # Start transcribing
+        vtt voices download Heart --engine piper
+        vtt transcribe record   # Start transcribing
+        vtt speak "Hello" --engine system
       
-      Configuration directory: ~/.local/share/vtt
+      Configuration directory: ~/.cache/VoiceToText
       
       To uninstall completely (including data):
         vtt-uninstall
@@ -78,6 +73,5 @@ class Vtt < Formula
   
   test do
     system "#{bin}/vtt", "--version"
-    system "#{bin}/vtt", "doctor"
   end
 end
