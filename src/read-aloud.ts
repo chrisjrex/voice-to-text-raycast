@@ -9,14 +9,12 @@ import {
 import { spawn } from "child_process";
 import {
   existsSync,
-  mkdirSync,
   openSync,
   readFileSync,
   unlinkSync,
   writeFileSync,
 } from "fs";
 import { createConnection } from "net";
-import { homedir } from "os";
 import { join } from "path";
 import {
   getActiveTtsVoice,
@@ -33,17 +31,38 @@ interface Preferences {
 }
 
 const KOKORO_SOCK = `/tmp/kokoro_tts_${process.getuid?.() ?? 0}.sock`;
-const KOKORO_PID = join(environment.supportPath, "tts", "daemon", "kokoro_server.pid");
-const KOKORO_SERVER_SCRIPT = join(environment.supportPath, "tts", "daemon", "kokoro_server.py");
-const KOKORO_LOG = join(environment.supportPath, "tts", "daemon", "kokoro_server.log");
+const KOKORO_PID = join(
+  environment.supportPath,
+  "tts",
+  "daemon",
+  "kokoro_server.pid",
+);
+const KOKORO_SERVER_SCRIPT = join(
+  environment.supportPath,
+  "tts",
+  "daemon",
+  "kokoro_server.py",
+);
+const KOKORO_LOG = join(
+  environment.supportPath,
+  "tts",
+  "daemon",
+  "kokoro_server.log",
+);
 
 function isKokoroServerRunning(): Promise<boolean> {
   if (!existsSync(KOKORO_SOCK)) return Promise.resolve(false);
   return new Promise((resolve) => {
     const conn = createConnection(KOKORO_SOCK);
-    conn.on("connect", () => { conn.destroy(); resolve(true); });
+    conn.on("connect", () => {
+      conn.destroy();
+      resolve(true);
+    });
     conn.on("error", () => resolve(false));
-    setTimeout(() => { conn.destroy(); resolve(false); }, 500);
+    setTimeout(() => {
+      conn.destroy();
+      resolve(false);
+    }, 500);
   });
 }
 
@@ -148,7 +167,11 @@ export {
 };
 export type { Preferences as ReadAloudPreferences };
 
-export const PLAYBACK_PID = join(environment.supportPath, "tts", "playback.pid");
+export const PLAYBACK_PID = join(
+  environment.supportPath,
+  "tts",
+  "playback.pid",
+);
 
 function isPlaying(): boolean {
   try {

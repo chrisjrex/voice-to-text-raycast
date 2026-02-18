@@ -5,7 +5,9 @@
   "description": "Voice-to-text and Text-to-Speech with local models",
   "icon": "icon.png",
   "author": "rex",
-  "categories": ["Productivity"],
+  "categories": [
+    "Productivity"
+  ],
   "license": "MIT",
   "commands": [
     {
@@ -127,9 +129,18 @@
       "required": false,
       "default": "OpenAI_GPT-4o_mini",
       "data": [
-        { "title": "GPT-4o Mini (default)", "value": "OpenAI_GPT-4o_mini" },
-        { "title": "Gemini 3 Flash", "value": "Google_Gemini_3_Flash" },
-        { "title": "Claude 4.5 Haiku", "value": "Anthropic_Claude_4.5_Haiku" }
+        {
+          "title": "GPT-4o Mini (default)",
+          "value": "OpenAI_GPT-4o_mini"
+        },
+        {
+          "title": "Gemini 3 Flash",
+          "value": "Google_Gemini_3_Flash"
+        },
+        {
+          "title": "Claude 4.5 Haiku",
+          "value": "Anthropic_Claude_4.5_Haiku"
+        }
       ]
     },
     {
@@ -175,5 +186,6 @@
     "lint": "ray lint",
     "test": "vitest run",
     "test:watch": "vitest"
-  }
+  },
+  "version": ""
 }
