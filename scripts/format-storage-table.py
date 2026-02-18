@@ -96,10 +96,13 @@ def format_storage_table(json_input: str) -> str:
 
     totals = data.get("totals", {})
     grand_total = totals.get("grand_total_human", "0 B")
-    lines.append("=" * 60)
-    lines.append(f"Total Storage Used: {grand_total:>30}")
-    lines.append("=" * 60)
-    lines.append("")
+    t = PrettyTable(["Total Storage Used", "Size"])
+    t.border = False
+    t.header = False
+    t.add_row(["", grand_total])
+    t.align = "l"
+    t.align["Size"] = "r"
+    lines.append(t.get_string())
 
     return "\n".join(lines)
 

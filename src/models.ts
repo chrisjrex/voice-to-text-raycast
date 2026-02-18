@@ -258,6 +258,7 @@ export async function installPiperEngine(pythonPath: string): Promise<void> {
     "install",
     "--break-system-packages",
     "piper-tts",
+    "hf_transfer",
   ]);
 }
 
@@ -280,7 +281,7 @@ export async function installKokoroEngine(
   }
   await execAsync(
     kokoroPython,
-    ["-m", "pip", "install", "kokoro", "soundfile", "numpy"],
+    ["-m", "pip", "install", "kokoro", "soundfile", "numpy", "hf_transfer"],
     600_000,
   );
 }

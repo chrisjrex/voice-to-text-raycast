@@ -9,6 +9,7 @@ export const ExitCodes = {
   NOT_DOWNLOADED: 3,
   UNKNOWN_VOICE: 4,
   UNKNOWN_MODEL: 5,
+  CONFIG_ERROR: 6,
 } as const;
 
 export type ExitCode = typeof ExitCodes[keyof typeof ExitCodes];

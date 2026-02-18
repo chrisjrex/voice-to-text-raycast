@@ -8,6 +8,7 @@ export {
   VOICE_ALIASES,
   MODEL_ALIASES,
   getVoiceByAlias,
+  getVoiceByAliasAndEngine,
   getModelByAlias,
   listAllVoices,
   listAllModels,
@@ -60,3 +61,15 @@ export {
 
 // Errors
 export { ExitCodes, type ExitCode } from "./errors";
+
+// LaunchAgent
+export {
+  installLaunchAgent,
+  uninstallLaunchAgent,
+  startLaunchAgent,
+  stopLaunchAgent,
+  isLaunchAgentRunning,
+  getLaunchAgentStatus,
+  isLaunchAgentInstalled,
+  type LaunchAgentConfig
+} from "./launchagent";

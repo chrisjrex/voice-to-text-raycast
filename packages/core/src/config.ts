@@ -24,7 +24,7 @@ const DEFAULT_CONFIG: Config = {
   pythonPath: "/opt/homebrew/bin/python3",
   kokoroPythonPath: `${homedir()}/.local/lib-kokoro/venv/bin/python3`,
   soxPath: "/opt/homebrew/bin/sox",
-  dataDir: `${homedir()}/.local/share/vtt`,
+  dataDir: `${homedir()}/.cache/VoiceToText`,
   kokoroSocket: `/tmp/kokoro_tts_${process.getuid?.() ?? 0}.sock`,
   kokoroIdleTimeout: 120,
   defaultSTTModel: "", // No default - model must be specified or set via VTT_DEFAULT_STT_MODEL

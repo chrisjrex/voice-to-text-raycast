@@ -5,7 +5,7 @@
  */
 
 import { Command } from "commander";
-import { readFileSync, existsSync, statSync, unlinkSync, readdirSync, rmdirSync } from "fs";
+import { readFileSync, existsSync, statSync, unlinkSync, readdirSync, rmdirSync, mkdirSync } from "fs";
 import { loadConfig, log, getRuntimeInfo } from "../../core/dist/index.js";
 import { getVoiceByAlias, getVoiceByAliasAndEngine, listAllVoices, getModelByAlias, listAllModels } from "../../core/dist/index.js";
 import { getTTSEngine, SystemTTSEngine } from "../../core/dist/index.js";
@@ -19,7 +19,42 @@ import {
   type RecordingResult,
   ExitCodes
 } from "../../core/dist/index.js";
-import { join } from "path";
+import {
+  installLaunchAgent,
+  uninstallLaunchAgent,
+  startLaunchAgent,
+  stopLaunchAgent,
+  isLaunchAgentRunning,
+  getLaunchAgentStatus,
+  isLaunchAgentInstalled,
+  type LaunchAgentConfig
+} from "../../core/dist/index.js";
+import { join, dirname } from "path";
+
+let spinnerInterval: NodeJS.Timeout | null = null;
+const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+const TRANSCRIBE_DAEMON_LABEL = "com.voicetotext.transcribe-daemon";
+const KOKORO_SERVER_LABEL = "com.voicetotext.kokoro-server";
+let spinnerFrame = 0;
+
+function startSpinner(message: string): void {
+  if (spinnerInterval) return;
+  process.stdout.write(`${spinnerFrames[0]} ${message}`);
+  spinnerInterval = setInterval(() => {
+    process.stdout.write("\r" + spinnerFrames[spinnerFrame] + " " + message + "     ");
+    spinnerFrame = (spinnerFrame + 1) % spinnerFrames.length;
+  }, 80);
+}
+
+function stopSpinner(message: string, success: boolean = true): void {
+  if (spinnerInterval) {
+    clearInterval(spinnerInterval);
+    spinnerInterval = null;
+  }
+  process.stdout.write("\r" + (success ? "✓" : "✗") + " " + message + "\n");
+  spinnerFrame = 0;
+}
 
 function cleanupRecordingsDir(dirPath: string): void {
   try {
@@ -75,10 +110,54 @@ function getPipInstallArgs(pythonPath: string): string[] {
   }
 }
 
+async function downloadKokoroVoice(pythonPath: string, voiceId: string): Promise<void> {
+  const { spawn } = require("child_process");
+  const { writeFileSync, unlinkSync } = require("fs");
+  const { join } = require("path");
+  const { tmpdir } = require("os");
+  
+  const langCode = voiceId.charAt(0);
+  const tempWav = join(tmpdir(), `vtt_download_${Date.now()}.wav`);
+  const script = `
+import sys, json, numpy as np, soundfile as sf
+from kokoro import KPipeline
+pipeline = KPipeline(lang_code="${langCode}")
+chunks = [audio for _, _, audio in pipeline("test", voice="${voiceId}")]
+sf.write("${tempWav}", np.concatenate(chunks), 24000)
+print("ok")
+`;
+  
+  return new Promise((resolve, reject) => {
+    const proc = spawn(pythonPath, ["-c", script], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    
+    let stderr = "";
+    proc.stderr.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+    
+    proc.on("close", (code: number | null) => {
+      try { unlinkSync(tempWav); } catch { /* ignore */ }
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(stderr || `Download failed with code ${code}`));
+      }
+    });
+    
+    proc.on("error", (err: Error) => {
+      try { unlinkSync(tempWav); } catch { /* ignore */ }
+      reject(err);
+    });
+  });
+}
+
 program
   .name("vtt")
   .description("Voice-to-Text CLI - Local STT and TTS\n\nRun 'vtt help-all' for comprehensive documentation")
-  .version("1.0.0");
+  .version("1.0.0")
+  .option("--verbose", "Show detailed output for all operations");
 
 // Speak command with speed control
 program
@@ -87,7 +166,7 @@ program
   .option("-f, --file <path>", "Read text from file")
   .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
   .option("-v, --voice <name>", "Voice alias (e.g., Heart, Amy, Samantha)", process.env.VTT_DEFAULT_TTS_VOICE || "Samantha")
-  .option("-s, --speed <factor>", "Playback speed factor (0.5-2.0)", "1.0")
+  .option("-s, --speed <factor>", "Playback speed factor (0.5-3.0)", "1.0")
   .option("-o, --output <path>", "Save to file instead of playing")
   .option("-q, --quiet", "Suppress non-error output")
   .action(async (text: string | undefined, options: { file?: string; engine?: string; voice: string; speed: string; output?: string; quiet?: boolean }) => {
@@ -127,8 +206,8 @@ program
 
     // Parse speed
     const speed = parseFloat(options.speed);
-    if (isNaN(speed) || speed < 0.5 || speed > 2.0) {
-      console.error("Error: Speed must be between 0.5 and 2.0");
+    if (isNaN(speed) || speed < 0.5 || speed > 3.0) {
+      console.error("Error: Speed must be between 0.5 and 3.0");
       process.exit(1);
     }
 
@@ -172,6 +251,11 @@ program
       // Generate audio
       const ttsRecordingsPath = getTtsRecordingsPath(config);
       const outputPath = options.output || join(ttsRecordingsPath, `${Date.now()}.wav`);
+      
+      // Ensure recordings directory exists
+      if (!options.output && !existsSync(ttsRecordingsPath)) {
+        mkdirSync(ttsRecordingsPath, { recursive: true });
+      }
       
       if (voice.provider === "system") {
         // System voices use native speed control
@@ -321,9 +405,10 @@ voicesCmd
   .command("download <voice>")
   .description("Download a voice by alias (requires --engine or VTT_DEFAULT_TTS_ENGINE)")
   .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
-  .action(async (voiceAlias: string, options: { engine?: string }) => {
+  .option("--verbose", "Show detailed output for all operations")
+  .action(async (voiceAlias: string, options: { engine?: string; verbose?: boolean }) => {
     const config = loadConfig();
-    const { homedir } = require("os");
+    const verbose = options.verbose || program.opts().verbose || false;
     const { join } = require("path");
     const { existsSync, mkdirSync } = require("fs");
 
@@ -383,41 +468,57 @@ voicesCmd
         }
       } else {
         // Headless mode - auto-install
-        console.log(`VTT_ASK_PERMISSION=false: Auto-installing ${requiredPackage}...`);
+        if (verbose) {
+          console.log(`VTT_ASK_PERMISSION=false: Auto-installing ${requiredPackage}...`);
+        }
       }
       
-      // Install required Python package
-      console.log(`Installing ${requiredPackage}...`);
-      
+      // Install required Python package + hf_transfer for faster downloads
       const { spawn } = require("child_process");
       const pipArgs = getPipInstallArgs(config.pythonPath);
+      const packagesToInstall = [requiredPackage, "hf_transfer"];
+      
+      if (verbose) {
+        console.log(`Installing ${packagesToInstall.join(", ")}...`);
+      } else {
+        startSpinner(`Installing ${packagesToInstall.join(", ")}`);
+      }
       
       await new Promise<void>((resolve, reject) => {
-        const installProc = spawn(config.pythonPath, [...pipArgs, requiredPackage], {
-          stdio: "inherit"
+        const installProc = spawn(config.pythonPath, [...pipArgs, ...packagesToInstall], {
+          stdio: verbose ? "inherit" : "pipe"
         });
+        
+        if (!verbose) {
+          installProc.stderr.on("data", () => {});
+        }
         
         installProc.on("close", (code: number) => {
           if (code !== 0) {
-            reject(new Error(`Failed to install ${requiredPackage}`));
+            reject(new Error(`Failed to install ${packagesToInstall.join(", ")}`));
           } else {
-            console.log(`✓ Installed ${requiredPackage}\n`);
+            if (verbose) {
+              console.log(`✓ Installed ${packagesToInstall.join(", ")}\n`);
+            } else {
+              stopSpinner(`Installed ${packagesToInstall.join(", ")}`);
+            }
             resolve();
           }
         });
         
         installProc.on("error", reject);
       }).catch((error) => {
+        if (!verbose) {
+          stopSpinner(`Failed to install ${packagesToInstall.join(", ")}`, false);
+        }
         console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       });
     }
     
-    console.log(`Downloading ${voiceAlias} (${voice.provider})...`);
     const { spawn } = require("child_process");
     
     if (voice.provider === "piper") {
-      // Download Piper voice files
       const ttsVoicesDir = join(config.dataDir, "tts", "voices");
       if (!existsSync(ttsVoicesDir)) {
         mkdirSync(ttsVoicesDir, { recursive: true });
@@ -431,10 +532,22 @@ voicesCmd
         return;
       }
       
-      // Download from HuggingFace
+      if (verbose) {
+        console.log(`Downloading ${voiceAlias} (${voice.provider})...`);
+      } else {
+        startSpinner(`Downloading ${voiceAlias}`);
+      }
+      
+      if (!process.env.HF_TOKEN) {
+        process.env.HF_TOKEN = process.env.VTT_HF_TOKEN;
+      }
+      
       const script = `
+import os
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+hf_token = os.environ.get("HF_TOKEN")
 from huggingface_hub import hf_hub_download
-path = hf_hub_download(repo_id="rhasspy/pipervoices", filename="${voiceFileName}", repo_type="model")
+path = hf_hub_download(repo_id="rhasspy/pipervoices", filename="${voiceFileName}", repo_type="model", token=hf_token)
 print(path)
 `;
       
@@ -443,7 +556,11 @@ print(path)
         let output = "";
         
         proc.stdout.on("data", (data: Buffer) => { output += data.toString(); });
-        proc.stderr.on("data", (data: Buffer) => { console.error(data.toString()); });
+        proc.stderr.on("data", (data: Buffer) => { 
+          if (verbose) { 
+            process.stderr.write(data);
+          } 
+        });
         
         proc.on("close", (code: number) => {
           if (code !== 0) {
@@ -454,17 +571,53 @@ print(path)
         });
         proc.on("error", reject);
       }).then((downloadedPath) => {
-        const { copyFileSync } = require("fs");
+        const { copyFileSync, statSync } = require("fs");
         copyFileSync(downloadedPath, voicePath);
-        console.log(`\n✓ Downloaded ${voiceAlias}`);
+        const fileSize = statSync(voicePath).size;
+        const sizeStr = fileSize > 1024 * 1024 
+          ? (fileSize / (1024 * 1024)).toFixed(1) + " MB" 
+          : (fileSize / 1024).toFixed(0) + " KB";
+        if (verbose) {
+          console.log(`\n✓ Downloaded ${voiceAlias} (${sizeStr})`);
+        } else {
+          stopSpinner(`Downloaded ${voiceAlias} (${sizeStr})`);
+        }
       }).catch((error) => {
+        if (!verbose) {
+          stopSpinner(`Failed to download ${voiceAlias}`, false);
+        }
         console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       });
       
     } else if (voice.provider === "kokoro") {
-      // Kokoro voices are downloaded as part of the package, just need to ensure it's set up
-      console.log(`\n✓ Voice "${voiceAlias}" is ready (Kokoro package handles voice files)`);
+      const kokoroPythonPath = config.kokoroPythonPath || process.env.VTT_KOKORO_PYTHON_PATH;
+      if (!kokoroPythonPath) {
+        console.error(`Error: Kokoro Python path not configured.`);
+        console.error(`Set VTT_KOKORO_PYTHON_PATH or run 'vtt doctor' to diagnose.`);
+        process.exit(ExitCodes.CONFIG_ERROR);
+      }
+      
+      if (verbose) {
+        console.log(`Downloading voice "${voiceAlias}"...`);
+      } else {
+        startSpinner(`Downloading ${voiceAlias}`);
+      }
+      
+      try {
+        await downloadKokoroVoice(kokoroPythonPath, voice.id);
+        if (verbose) {
+          console.log(`Voice "${voiceAlias}" downloaded successfully`);
+        } else {
+          stopSpinner(`Voice "${voiceAlias}" downloaded`);
+        }
+      } catch (error) {
+        if (!verbose) {
+          stopSpinner(`Failed to download ${voiceAlias}`, false);
+        }
+        console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
     }
   });
 
@@ -511,7 +664,7 @@ voicesCmd
   .command("preview <voice>")
   .description("Preview a voice (requires --engine or VTT_DEFAULT_TTS_ENGINE)")
   .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
-  .option("-s, --speed <factor>", "Playback speed factor (0.5-2.0)", "1.0")
+  .option("-s, --speed <factor>", "Playback speed factor (0.5-3.0)", "1.0")
   .action(async (voiceAlias: string, options: { engine?: string; speed: string }) => {
     const config = loadConfig();
 
@@ -536,8 +689,8 @@ voicesCmd
     }
 
     const speed = parseFloat(options.speed);
-    if (isNaN(speed) || speed < 0.5 || speed > 2.0) {
-      console.error("Error: Speed must be between 0.5 and 2.0");
+    if (isNaN(speed) || speed < 0.5 || speed > 3.0) {
+      console.error("Error: Speed must be between 0.5 and 3.0");
       process.exit(1);
     }
 
@@ -624,10 +777,8 @@ transcribeCmd
   .action(async (options) => {
     const config = loadConfig();
     const outputPath = options.output || join(config.dataDir, "transcription.json");
-    const { spawn } = require("child_process");
-    const { writeFileSync, existsSync, readFileSync } = require("fs");
+    const { writeFileSync, existsSync, readFileSync, mkdirSync } = require("fs");
     
-    // Check if model is provided or if VTT_DEFAULT_STT_MODEL is set
     let modelAlias = options.model || config.defaultSTTModel || process.env.VTT_DEFAULT_STT_MODEL;
     if (!modelAlias) {
       console.error("Error: No model specified.");
@@ -640,62 +791,59 @@ transcribeCmd
       process.exit(1);
     }
     
-    // Check if already running
-    const pidPath = join(config.dataDir, "stt", "daemon", "transcribe_daemon.pid");
-    if (existsSync(pidPath)) {
-      try {
-        const pid = parseInt(readFileSync(pidPath, "utf-8").trim(), 10);
-        process.kill(pid, 0);
-        console.error("Error: Transcription daemon is already running");
-        process.exit(1);
-      } catch {
-        // Process not running, clean up
-        try { require("fs").unlinkSync(pidPath); } catch {}
-      }
-    }
-    
     const model = getModelByAlias(modelAlias);
     if (!model) {
       console.error(`Error: Unknown model "${modelAlias}"`);
       process.exit(ExitCodes.UNKNOWN_MODEL);
     }
     
+    const isRunning = await isLaunchAgentRunning(TRANSCRIBE_DAEMON_LABEL);
+    if (isRunning) {
+      console.error("Error: Transcription daemon is already running");
+      console.error("Use 'vtt transcribe stop' to stop it first.");
+      process.exit(1);
+    }
+    
+    const daemonDir = join(config.dataDir, "stt", "daemon");
+    if (!existsSync(daemonDir)) {
+      mkdirSync(daemonDir, { recursive: true });
+    }
+    
     console.log(`Starting transcription daemon with model: ${modelAlias}`);
     
-    // Create daemon script
     const daemonScript = `
 import os, sys, json, signal, time
 import subprocess
 
-PID_PATH = ${JSON.stringify(pidPath)}
+try:
+    import setproctitle
+    setproctitle.setproctitle("voiceToText")
+except ImportError:
+    pass
+
 OUTPUT_PATH = ${JSON.stringify(outputPath)}
 SOX_PATH = ${JSON.stringify(config.soxPath)}
 VTT_CLI_PATH = ${JSON.stringify(join(__dirname, ".."))}
 
-# Recording settings
 SILENCE_TIMEOUT = ${parseInt(options.silenceTimeout) || 0}
 SILENCE_THRESHOLD = ${parseFloat(options.silenceThreshold) || 0.02}
 MAX_DURATION = ${parseInt(options.maxDuration) || 0}
 
-# Cleanup handler
-def cleanup(*args):
+running = True
+
+def cleanup(signum, frame):
+    global running
+    running = False
     sys.exit(0)
 
 signal.signal(signal.SIGTERM, cleanup)
 signal.signal(signal.SIGINT, cleanup)
 
-# Write PID
-with open(PID_PATH, "w") as f:
-    f.write(str(os.getpid()))
-
-# Start recording
 audio_path = os.path.join(${JSON.stringify(config.dataDir)}, f"recording_{os.getpid()}.wav")
 print(f"Recording to: {audio_path}", flush=True)
 
-# Build sox command
 cmd = [SOX_PATH, "-d", "-t", "wav", "-r", "16000", "-c", "1", "-b", "16", audio_path]
 
-# Run sox
 proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 start_time = time.time()
 silence_start = None
@@ -707,16 +855,14 @@ def stop_recording():
     except subprocess.TimeoutExpired:
         proc.kill()
 
-while proc.poll() is None:
+while running and proc.poll() is None:
     time.sleep(0.5)
     
-    # Check max duration
     if MAX_DURATION > 0 and time.time() - start_time >= MAX_DURATION:
         print("Max duration reached", flush=True)
         stop_recording()
         break
     
-    # Check silence
     if SILENCE_TIMEOUT > 0 and os.path.exists(audio_path) and os.path.getsize(audio_path) > 32000:
         try:
             result = subprocess.run(
@@ -738,7 +884,13 @@ while proc.poll() is None:
         except:
             pass
 
-# Now transcribe using vtt CLI
+if not running:
+    try:
+        os.unlink(audio_path)
+    except:
+        pass
+    sys.exit(0)
+
 print("Transcribing...", flush=True)
 
 transcribe_proc = subprocess.run(
@@ -746,7 +898,6 @@ transcribe_proc = subprocess.run(
     capture_output=True, text=True, timeout=300
 )
 
-# Write result
 if transcribe_proc.returncode == 0:
     try:
         result = json.loads(transcribe_proc.stdout.strip())
@@ -758,37 +909,48 @@ if transcribe_proc.returncode == 0:
 else:
     print(f"Transcription failed: {transcribe_proc.stderr}")
 
-# Cleanup
 try:
     os.unlink(audio_path)
 except:
     pass
-try:
-    os.unlink(PID_PATH)
-except:
-    pass
 `.trim();
 
-    const daemonPath = join(config.dataDir, "stt", "daemon", "transcribe_daemon.py");
+    const daemonPath = join(daemonDir, "transcribe_daemon.py");
     writeFileSync(daemonPath, daemonScript);
     
-    // Start daemon
-    const { openSync } = require("fs");
-    const logFd = openSync(join(config.dataDir, "stt", "daemon", "transcribe_daemon.log"), "a");
+    const logPath = "/tmp/com.voicetotext.transcribe-daemon.log";
+    const errorLogPath = "/tmp/com.voicetotext.transcribe-daemon.error.log";
     
-    const daemonProc = spawn(config.pythonPath, [daemonPath], {
-      detached: true,
-      stdio: ["ignore", logFd, logFd]
-    });
+    if (!isLaunchAgentInstalled(TRANSCRIBE_DAEMON_LABEL)) {
+      const launchAgentConfig: LaunchAgentConfig = {
+        label: TRANSCRIBE_DAEMON_LABEL,
+        programArguments: [config.pythonPath, daemonPath],
+        standardOutPath: logPath,
+        standardErrorPath: errorLogPath,
+        runAtLoad: false,
+        keepAlive: false,
+        environmentVariables: {
+          VTT_DATA_DIR: config.dataDir
+        }
+      };
+      await installLaunchAgent(launchAgentConfig);
+      console.log("Installed LaunchAgent.");
+    }
     
-    daemonProc.unref();
+    await startLaunchAgent(TRANSCRIBE_DAEMON_LABEL);
     
-    // Wait a moment to verify it started
-    await new Promise(r => setTimeout(r, 1000));
+    let status = await getLaunchAgentStatus(TRANSCRIBE_DAEMON_LABEL);
+    let retries = 5;
+    while (!status.running && retries > 0) {
+      await new Promise(r => setTimeout(r, 1000));
+      status = await getLaunchAgentStatus(TRANSCRIBE_DAEMON_LABEL);
+      retries--;
+    }
     
-    if (existsSync(pidPath)) {
-      console.log(`✓ Transcription daemon started (PID: ${readFileSync(pidPath, "utf-8").trim()})`);
+    if (status.running) {
+      console.log(`✓ Transcription daemon started (PID: ${status.pid})`);
       console.log(`Output will be saved to: ${outputPath}`);
+      console.log(`Logs: ${logPath}`);
     } else {
       console.error("Failed to start daemon");
       process.exit(1);
@@ -799,22 +961,15 @@ transcribeCmd
   .command("stop")
   .description("Stop background transcription and transcribe audio")
   .action(async () => {
-    const config = loadConfig();
-    const pidPath = join(config.dataDir, "stt", "daemon", "transcribe_daemon.pid");
+    const isRunning = await isLaunchAgentRunning(TRANSCRIBE_DAEMON_LABEL);
     
-    if (!existsSync(pidPath)) {
-      console.error("No transcription daemon is running");
-      process.exit(1);
+    if (!isRunning) {
+      console.log("No transcription daemon is running");
+      process.exit(0);
     }
     
-    try {
-      const pid = parseInt(readFileSync(pidPath, "utf-8").trim(), 10);
-      process.kill(pid, "SIGTERM");
-      console.log("✓ Sent stop signal to transcription daemon");
-    } catch (error) {
-      console.error(`Error stopping daemon: ${error instanceof Error ? error.message : String(error)}`);
-      try { unlinkSync(pidPath); } catch {}
-    }
+    await stopLaunchAgent(TRANSCRIBE_DAEMON_LABEL);
+    console.log("✓ Stopped transcription daemon");
   });
 
 transcribeCmd
@@ -822,31 +977,18 @@ transcribeCmd
   .description("Check background transcription status")
   .action(async () => {
     const config = loadConfig();
-    const pidPath = join(config.dataDir, "stt", "daemon", "transcribe_daemon.pid");
     const outputPath = join(config.dataDir, "transcription.json");
     
-    let isRunning = false;
-    let pid: number | null = null;
+    const status = await getLaunchAgentStatus(TRANSCRIBE_DAEMON_LABEL);
     
-    if (existsSync(pidPath)) {
-      try {
-        pid = parseInt(readFileSync(pidPath, "utf-8").trim(), 10);
-        process.kill(pid, 0);
-        isRunning = true;
-      } catch {
-        // Process not running
-        try { unlinkSync(pidPath); } catch {}
-      }
-    }
-    
-    const status = {
-      running: isRunning,
-      pid: pid,
+    const result = {
+      running: status.running,
+      pid: status.pid,
       output_exists: existsSync(outputPath),
       timestamp: new Date().toISOString()
     };
     
-    console.log(JSON.stringify(status, null, 2));
+    console.log(JSON.stringify(result, null, 2));
   });
 
 // Main transcribe command (original behavior)
@@ -961,6 +1103,11 @@ transcribeCmd
       // Record audio
       const sttRecordingsPath = getSttRecordingsPath(config);
       audioPath = join(sttRecordingsPath, `recording-${Date.now()}.wav`);
+      
+      // Ensure recordings directory exists
+      if (!existsSync(sttRecordingsPath)) {
+        mkdirSync(sttRecordingsPath, { recursive: true });
+      }
       
       const silenceTimeout = parseInt(options.silenceTimeout, 10) || 0;
       const silenceThreshold = parseFloat(options.silenceThreshold) || 0.02;
@@ -1145,8 +1292,10 @@ modelsCmd
 modelsCmd
   .command("download <model>")
   .description("Download a model by alias")
-  .action(async (modelAlias: string) => {
+  .option("--verbose", "Show detailed output for all operations")
+  .action(async (modelAlias: string, options: { verbose?: boolean }) => {
     const config = loadConfig();
+    const verbose = options.verbose || program.opts().verbose || false;
     const model = getModelByAlias(modelAlias);
     
     if (!model) {
@@ -1164,21 +1313,31 @@ modelsCmd
     
     // Install required Python package if not already installed
     const requiredPackage = model.provider === "whisper" ? "mlx-whisper" : "parakeet-mlx";
-    console.log(`Installing ${requiredPackage}...`);
+    
+    if (verbose) {
+      console.log(`Installing ${requiredPackage}...`);
+    }
     
     const { spawn } = require("child_process");
     const pipArgs = getPipInstallArgs(config.pythonPath);
     
     await new Promise<void>((resolve, reject) => {
       const installProc = spawn(config.pythonPath, [...pipArgs, requiredPackage], {
-        stdio: "inherit"
+        stdio: verbose ? "inherit" : "pipe"
       });
+      
+      if (!verbose) {
+        installProc.stdout.on("data", () => {});
+        installProc.stderr.on("data", () => {});
+      }
       
       installProc.on("close", (code: number) => {
         if (code !== 0) {
           reject(new Error(`Failed to install ${requiredPackage}`));
         } else {
-          console.log(`✓ Installed ${requiredPackage}\n`);
+          if (verbose) {
+            console.log(`✓ Installed ${requiredPackage}`);
+          }
           resolve();
         }
       });
@@ -1189,29 +1348,54 @@ modelsCmd
       process.exit(1);
     });
     
-    console.log(`Downloading ${modelAlias} (${model.id})...`);
-    console.log(`Size: ${model.size}`);
-    console.log("This may take several minutes...");
+    if (verbose) {
+      console.log(`Downloading ${modelAlias} (${model.id})...`);
+      console.log(`Size: ${model.size}`);
+      console.log("This may take several minutes...");
+    } else {
+      startSpinner(`Downloading ${modelAlias}`);
+    }
     
-    const script = `from huggingface_hub import snapshot_download; snapshot_download("${model.id}")`;
+    if (!process.env.HF_TOKEN) {
+      process.env.HF_TOKEN = process.env.VTT_HF_TOKEN;
+    }
+    
+    const script = `
+import os
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+hf_token = os.environ.get("HF_TOKEN")
+from huggingface_hub import snapshot_download
+snapshot_download("${model.id}", token=hf_token)
+`;
     
     return new Promise<void>((resolve, reject) => {
       const proc = spawn(config.pythonPath, ["-c", script], {
-        stdio: "inherit",
+        stdio: verbose ? "inherit" : "pipe",
         timeout: 600_000
       });
+      
+      if (!verbose) {
+        proc.stderr.on("data", () => {});
+      }
       
       proc.on("close", (code: number) => {
         if (code !== 0) {
           reject(new Error(`Download failed with code ${code}`));
         } else {
-          console.log(`\n✓ Downloaded ${modelAlias}`);
+          if (verbose) {
+            console.log(`\n✓ Downloaded ${modelAlias}`);
+          } else {
+            stopSpinner(`Downloaded ${modelAlias}`);
+          }
           resolve();
         }
       });
       
       proc.on("error", reject);
     }).catch((error) => {
+      if (!verbose) {
+        stopSpinner(`Failed to download ${modelAlias}`, false);
+      }
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);
     });
@@ -1266,9 +1450,8 @@ serverCmd
   .action(async (options) => {
     const config = loadConfig();
     const timeout = parseInt(options.timeout, 10);
-    
-    // Check if already running
     const { createConnection } = require("net");
+    
     const isRunning = await new Promise<boolean>((resolve) => {
       if (!existsSync(config.kokoroSocket)) {
         resolve(false);
@@ -1291,7 +1474,6 @@ serverCmd
       return;
     }
     
-    // Check if Kokoro is installed
     const { spawn } = require("child_process");
     const kokoroAvailable = await new Promise<boolean>((resolve) => {
       const proc = spawn(config.kokoroPythonPath, ["-c", "import kokoro"], { timeout: 5000 });
@@ -1301,19 +1483,23 @@ serverCmd
     
     if (!kokoroAvailable) {
       console.error("Error: Kokoro not found.");
-      console.error(`Install with: ${config.kokoroPythonPath} -m pip install kokoro soundfile numpy`);
+      console.error(`Install with: ${config.kokoroPythonPath} -m pip install kokoro soundfile numpy hf_transfer`);
       process.exit(2);
     }
     
     console.log(`Starting Kokoro server (timeout: ${timeout}s)...`);
     
-    // Build server script
     const serverScript = `
 import json, os, select, signal, socket, sys, time, numpy as np, soundfile as sf
 from kokoro import KPipeline
 
+try:
+    import setproctitle
+    setproctitle.setproctitle("voiceToText-Kokoro")
+except ImportError:
+    pass
+
 SOCK_PATH = ${JSON.stringify(config.kokoroSocket)}
-PID_PATH = ${JSON.stringify(join(config.dataDir, "tts", "daemon", "kokoro_server.pid"))}
 IDLE_TIMEOUT = ${timeout}
 
 pipelines = {}
@@ -1346,8 +1532,6 @@ def handle_client(conn):
 def cleanup(*_):
     try: os.unlink(SOCK_PATH)
     except: pass
-    try: os.unlink(PID_PATH)
-    except: pass
     sys.exit(0)
 
 signal.signal(signal.SIGTERM, cleanup)
@@ -1356,14 +1540,15 @@ signal.signal(signal.SIGINT, cleanup)
 try: os.unlink(SOCK_PATH)
 except: pass
 
-with open(PID_PATH, "w") as f:
-    f.write(str(os.getpid()))
-
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 sock.bind(SOCK_PATH)
 sock.listen(1)
 
 print(f"Server listening on {SOCK_PATH}")
+
+print("Warming up model...")
+get_pipeline("a")
+print("Ready")
 
 last_activity = time.monotonic()
 while True:
@@ -1380,23 +1565,34 @@ while True:
         conn.close()
     last_activity = time.monotonic()
 `.trim();
+
+    const { writeFileSync, mkdirSync } = require("fs");
+    const daemonDir = join(config.dataDir, "tts", "daemon");
+    if (!existsSync(daemonDir)) {
+      mkdirSync(daemonDir, { recursive: true });
+    }
     
-    const scriptPath = join(config.dataDir, "tts", "daemon", "kokoro_server.py");
-    const { writeFileSync } = require("fs");
+    const scriptPath = join(daemonDir, "kokoro_server.py");
     writeFileSync(scriptPath, serverScript);
     
-    // Start server in background
-    const { openSync } = require("fs");
-    const logFd = openSync(join(config.dataDir, "tts", "daemon", "kokoro_server.log"), "a");
+    const logPath = "/tmp/com.voicetotext.kokoro-server.log";
+    const errorLogPath = "/tmp/com.voicetotext.kokoro-server.error.log";
     
-    const proc = spawn(config.kokoroPythonPath, [scriptPath], {
-      detached: true,
-      stdio: ["ignore", logFd, logFd]
-    });
+    if (!isLaunchAgentInstalled(KOKORO_SERVER_LABEL)) {
+      const launchAgentConfig: LaunchAgentConfig = {
+        label: KOKORO_SERVER_LABEL,
+        programArguments: [config.kokoroPythonPath, scriptPath],
+        standardOutPath: logPath,
+        standardErrorPath: errorLogPath,
+        runAtLoad: false,
+        keepAlive: false
+      };
+      await installLaunchAgent(launchAgentConfig);
+      console.log("Installed LaunchAgent.");
+    }
     
-    proc.unref();
+    await startLaunchAgent(KOKORO_SERVER_LABEL);
     
-    // Wait for server to start
     const deadline = Date.now() + 8000;
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 500));
@@ -1419,19 +1615,19 @@ while True:
       });
       
       if (running) {
-        console.log("✓ Kokoro server started");
+        const status = await getLaunchAgentStatus(KOKORO_SERVER_LABEL);
+        console.log(`✓ Kokoro server started (PID: ${status.pid})`);
+        console.log(`Logs: ${logPath}`);
         return;
       }
       
-      // Check for errors in log
       try {
-        const log = readFileSync(join(config.dataDir, "kokoro_server.log"), "utf-8").trim();
+        const log = readFileSync(logPath, "utf-8").trim();
         if (log.includes("Traceback") || log.includes("Error")) {
           const lastLines = log.split("\n").slice(-3).join(" ").slice(0, 120);
           throw new Error(lastLines);
         }
       } catch {
-        // Ignore
       }
     }
     
@@ -1443,28 +1639,22 @@ serverCmd
   .description("Stop the Kokoro TTS server")
   .action(async () => {
     const config = loadConfig();
-    const pidPath = join(config.dataDir, "tts", "daemon", "kokoro_server.pid");
+    const isRunning = await isLaunchAgentRunning(KOKORO_SERVER_LABEL);
     
-    if (!existsSync(pidPath)) {
-      console.log("Server is not running (no PID file found).");
-      return;
-    }
-    
-    try {
-      const pid = parseInt(readFileSync(pidPath, "utf-8").trim(), 10);
-      process.kill(pid, "SIGTERM");
-      console.log("✓ Kokoro server stopped");
-    } catch (error) {
-      console.error(`Error stopping server: ${error instanceof Error ? error.message : String(error)}`);
-      
-      // Cleanup socket and PID file
+    if (!isRunning) {
+      console.log("Server is not running.");
       try {
         unlinkSync(config.kokoroSocket);
       } catch {}
-      try {
-        unlinkSync(pidPath);
-      } catch {}
+      return;
     }
+    
+    await stopLaunchAgent(KOKORO_SERVER_LABEL);
+    console.log("✓ Kokoro server stopped");
+    
+    try {
+      unlinkSync(config.kokoroSocket);
+    } catch {}
   });
 
 serverCmd
@@ -1474,7 +1664,7 @@ serverCmd
     const config = loadConfig();
     const { createConnection } = require("net");
     
-    const isRunning = await new Promise<boolean>((resolve) => {
+    const isRunningSocket = await new Promise<boolean>((resolve) => {
       if (!existsSync(config.kokoroSocket)) {
         resolve(false);
         return;
@@ -1491,14 +1681,13 @@ serverCmd
       }, 500);
     });
     
-    if (isRunning) {
+    const launchAgentStatus = await getLaunchAgentStatus(KOKORO_SERVER_LABEL);
+    
+    if (isRunningSocket) {
       console.log("Status: Running");
       console.log(`Socket: ${config.kokoroSocket}`);
-      
-      const pidPath = join(config.dataDir, "tts", "daemon", "kokoro_server.pid");
-      if (existsSync(pidPath)) {
-        const pid = readFileSync(pidPath, "utf-8").trim();
-        console.log(`PID: ${pid}`);
+      if (launchAgentStatus.pid) {
+        console.log(`PID: ${launchAgentStatus.pid}`);
       }
     } else {
       console.log("Status: Not running");
@@ -1543,6 +1732,7 @@ program
     if (process.env.VTT_TTS_RECORDINGS_PATH) configuredEnvVars.VTT_TTS_RECORDINGS_PATH = process.env.VTT_TTS_RECORDINGS_PATH;
     if (process.env.VTT_STT_RECORDINGS_PATH) configuredEnvVars.VTT_STT_RECORDINGS_PATH = process.env.VTT_STT_RECORDINGS_PATH;
     if (process.env.VTT_ASK_PERMISSION) configuredEnvVars.VTT_ASK_PERMISSION = process.env.VTT_ASK_PERMISSION;
+    if (process.env.VTT_HF_TOKEN) configuredEnvVars.VTT_HF_TOKEN = process.env.VTT_HF_TOKEN;
     
     // Check dependencies
     const soxInstalled = await checkCommand(config.soxPath, ["--version"]);
@@ -2475,7 +2665,7 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
     VTT_PYTHON_PATH          Path to Python 3.10+ (default: /opt/homebrew/bin/python3)
     VTT_KOKORO_PYTHON_PATH   Path to Python for Kokoro (default: ~/.local/lib-kokoro/venv/bin/python3)
     VTT_SOX_PATH             Path to sox binary (default: /opt/homebrew/bin/sox)
-    VTT_DATA_DIR             Data directory (default: ~/.local/share/vtt)
+    VTT_DATA_DIR             Data directory (default: ~/.cache/VoiceToText)
     VTT_KOKORO_SOCKET        Unix socket path (default: /tmp/kokoro_tts_<uid>.sock)
     VTT_KOKORO_IDLE_TIMEOUT  Server idle timeout (default: 120)
     VTT_DEFAULT_STT_MODEL    Default model (default: whisper-tiny)

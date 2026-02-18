@@ -29,7 +29,7 @@ If you prefer managing dependencies yourself:
 ```bash
 # Install prerequisites
 brew install sox python@3.11
-pip3 install mlx-whisper  # or parakeet-mlx
+pip3 install mlx-whisper setproctitle  # or parakeet-mlx
 
 # Install VTT
 npm install -g @vtt/cli-lite
@@ -191,6 +191,7 @@ These apply across all commands (Raycast Settings > Extensions > Voice-to-Text):
 - `VTT_KOKORO_PYTHON_PATH`
 - `VTT_SOX_PATH`
 - `VTT_DATA_DIR`
+- `VTT_HF_TOKEN` - HuggingFace token for higher rate limits (also respects `HF_TOKEN`)
 
 ---
 

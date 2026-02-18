@@ -199,6 +199,9 @@ export VTT_DEFAULT_TTS_VOICE=Heart
 
 # Data directory
 export VTT_DATA_DIR="$HOME/.local/share/vtt"
+
+# HuggingFace token for higher rate limits (also respects HF_TOKEN)
+export VTT_HF_TOKEN="your_hf_token"
 ```
 
 **Note:** Environment variables take precedence over bundled runtime.
@@ -304,6 +307,9 @@ fi
 
 **Issue:** Permission errors
 - **Solution:** Fix data directory permissions: `chmod -R 755 ~/.local/share/vtt`
+
+**Issue:** Daemon not visible in Activity Monitor (when using custom Python)
+- **Solution:** Install setproctitle: `pip3 install setproctitle`
 
 **Issue:** Want to use system Python instead of bundled
 - **Solution:** Set `VTT_PYTHON_PATH` environment variable

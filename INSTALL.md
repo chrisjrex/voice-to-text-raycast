@@ -47,6 +47,9 @@ pip3 install mlx-whisper      # For multilingual STT
 pip3 install parakeet-mlx     # For English-only STT (faster)
 pip3 install piper-tts        # For lightweight TTS
 
+# Required for background daemon visibility in Activity Monitor
+pip3 install setproctitle
+
 # For Kokoro TTS (optional, requires Python 3.10-3.12)
 python3.11 -m venv ~/.local/lib-kokoro/venv
 ~/.local/lib-kokoro/venv/bin/pip install kokoro soundfile numpy
@@ -175,8 +178,16 @@ chmod -R 755 ~/.local/share/vtt
 
 Install required packages:
 ```bash
-pip3 install mlx-whisper parakeet-mlx piper-tts
+pip3 install mlx-whisper parakeet-mlx piper-tts setproctitle
 ```
+
+### Daemon not visible in Activity Monitor
+
+If running `vtt transcribe start` but don't see the process in Activity Monitor, install setproctitle:
+```bash
+pip3 install setproctitle
+```
+Then restart the daemon: `vtt transcribe stop && vtt transcribe start`
 
 ### Check what's installed
 

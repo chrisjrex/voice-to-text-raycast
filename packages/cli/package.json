@@ -29,8 +29,7 @@
   "license": "MIT",
   "dependencies": {
     "@vtt/core": "file:../core",
-    "commander": "^12.0.0",
-    "terminal-table": "^0.0.12"
+    "commander": "^12.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",

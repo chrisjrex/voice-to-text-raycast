@@ -37,6 +37,16 @@ const KOKORO_PID = join(environment.supportPath, "tts", "daemon", "kokoro_server
 const KOKORO_SERVER_SCRIPT = join(environment.supportPath, "tts", "daemon", "kokoro_server.py");
 const KOKORO_LOG = join(environment.supportPath, "tts", "daemon", "kokoro_server.log");
 
+function isKokoroServerRunning(): Promise<boolean> {
+  if (!existsSync(KOKORO_SOCK)) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const conn = createConnection(KOKORO_SOCK);
+    conn.on("connect", () => { conn.destroy(); resolve(true); });
+    conn.on("error", () => resolve(false));
+    setTimeout(() => { conn.destroy(); resolve(false); }, 500);
+  });
+}
+
 async function startKokoroServer(
   pythonPath: string,
   idleTimeout = 120,

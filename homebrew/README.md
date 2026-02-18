@@ -130,15 +130,56 @@ brew upgrade vtt  # or vtt-lite
 
 ## Development
 
-To test formulas locally:
+### Testing Formulas Locally
+
+Since the formulas reference GitHub releases and npm packages that may not exist yet, use these methods for testing:
+
+#### Option 1: Skip SHA256 verification (Quick Test)
 
 ```bash
-# Install from local file
+# Install with SHA256 verification disabled
+brew install --build-from-source --ignore-dependencies ./vtt.rb
+
+# For vtt-lite
+brew install --build-from-source --ignore-dependencies ./vtt-lite.rb
+```
+
+#### Option 2: Build Runtime and Update SHA256
+
+1. Build the runtime locally:
+```bash
+./scripts/build-runtime.sh
+```
+
+2. Get the SHA256 hash:
+```bash
+shasum -a 256 vtt-runtime-3.11.9-macos-arm64.tar.gz
+```
+
+3. Update the formula with the real hash, then install:
+```bash
 brew install --build-from-source ./vtt.rb
+```
+
+#### Option 3: Test Formula Syntax
+
+```bash
+# Check formula for errors
+brew audit --strict ./vtt.rb
 
 # Test formula
-brew test vtt
+brew test ./vtt.rb
 ```
+
+### Before Publishing
+
+1. Build and upload runtime to GitHub releases
+2. Publish npm packages (@vtt/cli and @vtt/cli-lite)
+3. Update SHA256 hashes in formulas:
+   - Runtime tarball SHA256
+   - npm package SHA256
+4. Test installation: `brew install chrisjrex/vtt/vtt`
+5. Create PR to homebrew tap repository
 
 ## License
 

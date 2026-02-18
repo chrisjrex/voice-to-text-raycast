@@ -22,7 +22,7 @@ export interface RecordingResult {
 
 /**
  * Adjust audio speed using sox tempo command
- * speed: 0.5-2.0 (0.5 = half speed, 2.0 = double speed)
+  * speed: 0.5-3.0 (0.5 = half speed, 3.0 = 3x speed)
  */
 export async function adjustAudioSpeed(
   inputPath: string,
@@ -31,7 +31,7 @@ export async function adjustAudioSpeed(
   soxPath: string
 ): Promise<void> {
   // Clamp speed to reasonable range
-  const clampedSpeed = Math.max(0.5, Math.min(2.0, speed));
+  const clampedSpeed = Math.max(0.5, Math.min(3.0, speed));
   
   // For speeds between 0.5-0.9 and 1.1-2.0, use tempo
   // For speed exactly 1.0, just copy
@@ -42,9 +42,9 @@ export async function adjustAudioSpeed(
     return;
   }
   
-  // Calculate tempo factor (inverse of speed)
-  // If we want 1.5x speed, we need tempo 0.666
-  const tempoFactor = 1 / clampedSpeed;
+  // Use speed directly with sox tempo
+  // speed > 1.0 = faster, speed < 1.0 = slower
+  const tempoFactor = clampedSpeed;
   
   return new Promise((resolve, reject) => {
     const proc = spawn(soxPath, [
@@ -77,7 +77,7 @@ export async function adjustAudioSpeed(
  * Get playback PID file path
  */
 export function getPlaybackPidPath(config: Config): string {
-  return join(config.dataDir, "playback.pid");
+  return join(config.dataDir, "tts", "playback.pid");
 }
 
 /**

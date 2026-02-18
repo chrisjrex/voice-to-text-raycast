@@ -44,6 +44,11 @@ pip3 install piper-tts
 # See Kokoro setup section below
 ```
 
+**Background Daemon** (for Activity Monitor visibility):
+```bash
+pip3 install setproctitle
+```
+
 ### 4. Kokoro TTS Setup (Optional)
 
 Kokoro requires Python 3.10-3.12 due to spacy/blis dependencies. If your system Python is newer, create an isolated environment:
@@ -110,6 +115,9 @@ export VTT_DEFAULT_STT_MODEL=whisper-tiny
 
 # Default TTS voice
 export VTT_DEFAULT_TTS_VOICE=Samantha
+
+# HuggingFace token for higher rate limits (also respects HF_TOKEN)
+export VTT_HF_TOKEN="your_hf_token"
 ```
 
 ### Using Python Version Managers
@@ -176,6 +184,9 @@ Common commands:
 
 **Issue:** `vtt doctor` shows missing dependencies
 - **Solution:** Install prerequisites listed above
+
+**Issue:** Daemon not visible in Activity Monitor
+- **Solution:** Install setproctitle: `pip3 install setproctitle`
 
 **Issue:** Kokoro voice download fails
 - **Solution:** Ensure `VTT_KOKORO_PYTHON_PATH` points to Python 3.10-3.12

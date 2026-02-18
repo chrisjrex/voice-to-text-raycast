@@ -63,8 +63,10 @@ export const VOICE_ALIASES: Record<string, VoiceInfo> = {};
 for (const engine of Object.values(VOICES_BY_ENGINE)) {
   for (const [alias, info] of Object.entries(engine)) {
     VOICE_ALIASES[alias] = info;
+    VOICE_ALIASES[alias.toLowerCase()] = info;
   }
 }
+
 
 export interface ModelInfo {
   id: string;
@@ -120,7 +122,19 @@ export const MODEL_ALIASES: Record<string, ModelInfo> = {
 };
 
 export function getVoiceByAlias(alias: string): VoiceInfo | undefined {
-  return VOICE_ALIASES[alias];
+  return VOICE_ALIASES[alias.toLowerCase()];
+}
+
+export function getVoiceByAliasAndEngine(alias: string, engine: string): VoiceInfo | undefined {
+  const engineVoices = VOICES_BY_ENGINE[engine.toLowerCase()];
+  if (!engineVoices) return undefined;
+  const lowerAlias = alias.toLowerCase();
+  for (const [key, info] of Object.entries(engineVoices)) {
+    if (key.toLowerCase() === lowerAlias) {
+      return info;
+    }
+  }
+  return undefined;
 }
 
 export function getModelByAlias(alias: string): ModelInfo | undefined {
@@ -128,9 +142,15 @@ export function getModelByAlias(alias: string): ModelInfo | undefined {
 }
 
 export function listAllVoices(): Array<{ alias: string; info: VoiceInfo }> {
+  const seen = new Set<string>();
   const voices: Array<{ alias: string; info: VoiceInfo }> = [];
   for (const [engineName, engineVoices] of Object.entries(VOICES_BY_ENGINE)) {
     for (const [alias, info] of Object.entries(engineVoices)) {
+      const lowerAlias = alias.toLowerCase();
+      if (seen.has(lowerAlias)) {
+        continue;
+      }
+      seen.add(lowerAlias);
       voices.push({ alias, info });
     }
   }
