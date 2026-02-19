@@ -1,40 +1,74 @@
 # Installation Guide
 
-VTT (Voice-to-Text) offers two installation methods to suit different needs.
+VTT (Voice-to-Text) offers multiple installation methods to suit different needs.
 
 ## Choose Your Installation
 
-### Option 1: Bundled Version (Recommended) ⭐
+### Option 1: Install Script (Recommended) ⭐
 
 **Best for:** Quick start, general users, anyone who wants it to "just work"
 
 **What you get:**
-- Python 3.11 runtime (bundled)
-- All required Python packages
-- sox binary
+- Bundled Python 3.11 runtime with all packages
 - VTT CLI tool
+- Everything extracted to `~/.local/`
 
-**Install via NPM:**
+**Install:**
+```bash
+curl -sSL https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main/scripts/install.sh | bash
+```
+
+**Or download and run manually:**
+```bash
+curl -sSL -o install-vtt.sh https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main/scripts/install.sh
+chmod +x install-vtt.sh
+./install-vtt.sh
+```
+
+**Size:** ~300MB download, ~1.1GB installed
+
+---
+
+### Option 2: NPM Package
+
+**Best for:** Developers who already have Python 3.10+ installed
+
+**What you get:**
+- VTT CLI tool
+- Uses your system Python and dependencies
+
+**Prerequisites:**
+```bash
+brew install sox python@3.11
+pip3 install mlx-whisper parakeet-mlx piper-tts kokoro
+```
+
+**Install:**
 ```bash
 npm install -g @vtt/cli
 ```
 
-**Or via Homebrew:**
+**Size:** ~36KB download
+
+---
+
+### Option 3: Homebrew
+
+**Best for:** Homebrew users
+
 ```bash
 brew tap chrisjrex/vtt
 brew install vtt
 ```
 
-**Size:** ~50MB download, ~150MB installed
-
 ---
 
-### Option 2: Lite Version
+### Option 4: Lite Version (Advanced)
 
-**Best for:** Developers, minimalists, those who already have Python packages installed
+**Best for:** Minimalists, those who want full control over dependencies
 
 **What you get:**
-- VTT CLI tool only
+- VTT CLI tool only (~500KB)
 - Uses your system Python and dependencies
 
 **Prerequisites:**
@@ -72,7 +106,7 @@ brew install vtt-lite
 
 ## Quick Start
 
-After installation (either version):
+After installation:
 
 ```bash
 # Verify installation
@@ -97,26 +131,32 @@ vtt speak "Hello world" # Text-to-speech
 
 ## Comparison
 
-| Feature | Bundled (`@vtt/cli`) | Lite (`@vtt/cli-lite`) |
-|---------|---------------------|----------------------|
-| **Setup time** | Instant | 10-15 minutes |
-| **Download size** | ~50MB | ~500KB |
-| **Disk usage** | ~150MB | ~50MB (shared with system) |
-| **Dependencies** | None | sox, Python 3.11, pip packages |
-| **Python version** | 3.11 (pinned) | Your choice (3.10+) |
-| **Offline use** | ✅ Yes | ✅ Yes (after setup) |
-| **Best for** | Quick start | Developers, custom setups |
+| Feature | Install Script | NPM (`@vtt/cli`) | Lite (`@vtt/cli-lite`) |
+|---------|---------------|------------------|----------------------|
+| **Setup time** | 2-3 minutes | Instant* | 10-15 minutes |
+| **Download size** | ~300MB | ~36KB | ~500KB |
+| **Disk usage** | ~1.1GB | Shared with system | ~50MB (shared) |
+| **Dependencies** | Node.js only | Python 3.10+, sox | Python 3.10+, sox, pip packages |
+| **Python version** | Bundled 3.11 | System Python | Your choice (3.10+) |
+| **Offline use** | ✅ Yes | ✅ Yes | ✅ Yes (after setup) |
+| **Best for** | Quick start | Developers | Minimalists, custom setups |
+
+\* After npm install, run `vtt doctor` to verify Python dependencies
 
 ---
 
 ## Switching Between Versions
 
 ```bash
-# Switch from lite to bundled
-npm uninstall -g @vtt/cli-lite
+# From install script to npm
+rm -rf ~/.local/share/vtt ~/.local/bin/vtt
 npm install -g @vtt/cli
 
-# Switch from bundled to lite
+# From npm to install script
+npm uninstall -g @vtt/cli
+# Then run install script
+
+# Switch to lite version
 npm uninstall -g @vtt/cli
 npm install -g @vtt/cli-lite
 # Then install prerequisites (see vtt doctor)
@@ -126,23 +166,28 @@ npm install -g @vtt/cli-lite
 
 ## Uninstalling
 
-### Bundled Version
+### Install Script Installation
+```bash
+rm -rf ~/.local/share/vtt
+rm -f ~/.local/bin/vtt
+```
+
+### NPM Installation
 ```bash
 npm uninstall -g @vtt/cli
 # Remove data directory
-rm -rf ~/.local/share/vtt
+rm -rf ~/.cache/VoiceToText/
 ```
 
 ### Lite Version
 ```bash
 npm uninstall -g @vtt/cli-lite
 # Remove data directory
-rm -rf ~/.local/share/vtt
+rm -rf ~/.cache/VoiceToText/
 ```
 
-### Homebrew (either version)
+### Homebrew (any version)
 ```bash
-vtt-uninstall          # Remove data
 brew uninstall vtt     # or vtt-lite
 brew untap chrisjrex/vtt  # Optional: remove tap
 ```
@@ -162,7 +207,12 @@ brew untap chrisjrex/vtt  # Optional: remove tap
 
 ### "vtt: command not found"
 
-Ensure npm global bin is in your PATH:
+**Install script:** Add to PATH:
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+**NPM:** Ensure npm global bin is in your PATH:
 ```bash
 export PATH="$PATH:$(npm config get prefix)/bin"
 ```
@@ -172,18 +222,20 @@ export PATH="$PATH:$(npm config get prefix)/bin"
 Fix data directory permissions:
 ```bash
 chmod -R 755 ~/.local/share/vtt
+# or
+chmod -R 755 ~/.cache/VoiceToText/
 ```
 
-### Missing Python packages (lite version only)
+### Missing Python packages (npm/lite versions only)
 
 Install required packages:
 ```bash
-pip3 install mlx-whisper parakeet-mlx piper-tts setproctitle
+pip3 install mlx-whisper parakeet-mlx piper-tts kokoro setproctitle
 ```
 
 ### Daemon not visible in Activity Monitor
 
-If running `vtt transcribe start` but don't see the process in Activity Monitor, install setproctitle:
+Install setproctitle:
 ```bash
 pip3 install setproctitle
 ```
