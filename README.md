@@ -6,36 +6,45 @@ Local voice-to-text and text-to-speech for Raycast. Everything runs on-device â€
 
 ## Installation
 
-### Quick Install (Recommended)
+### Option 1: Install Script (Recommended)
 
-Zero-setup installation with bundled runtime:
+Zero-setup with bundled Python runtime:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main/scripts/install.sh | bash
+```
+
+This installs everything including Python 3.11 and all dependencies to `~/.local/`.
+
+### Option 2: NPM (if you have Python already)
 
 ```bash
 npm install -g @vtt/cli
 ```
 
-Or via Homebrew:
+**Prerequisites:** Python 3.10+ and sox (`brew install python sox`)
+
+### Option 3: Homebrew
+
 ```bash
 brew tap chrisjrex/vtt
 brew install vtt
 ```
 
-That's it! Everything is included (Python 3.11, all packages, sox).
-
-### Lite Install (Advanced)
+### Option 4: Lite Install (Advanced)
 
 If you prefer managing dependencies yourself:
 
 ```bash
 # Install prerequisites
 brew install sox python@3.11
-pip3 install mlx-whisper setproctitle  # or parakeet-mlx
+pip3 install mlx-whisper parakeet-mlx piper-tts kokoro
 
 # Install VTT
 npm install -g @vtt/cli-lite
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed installation options.
+See [packages/cli/README.md](packages/cli/README.md) for detailed installation options.
 
 ---
 
