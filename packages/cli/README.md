@@ -1,46 +1,53 @@
 # VTT CLI
 
-Self-contained Voice-to-Text CLI tool with zero dependencies. Everything is bundled - just install and use.
-
-> **Want smaller download?** Use [`@vtt/cli-lite`](https://www.npmjs.com/package/@vtt/cli-lite) if you prefer managing dependencies yourself.
+Voice-to-Text CLI tool for local speech recognition and synthesis. Works offline using Apple MLX.
 
 ## Features
 
-- **Zero Setup**: Includes Python 3.11, sox, and all required packages
 - **Speech-to-Text**: Local transcription using Whisper or Parakeet
 - **Text-to-Speech**: Multiple voice engines (System, Piper, Kokoro)
 - **Offline**: Works completely offline after installation
 - **Fast**: Apple Silicon optimized via MLX
+- **Private**: All processing happens locally
 
 ## Installation
 
-### NPM (Recommended)
+### Option 1: Install Script (Bundled Runtime)
 
-```bash
-npm install -g @vtt/cli
-```
-
-### Homebrew
-
-```bash
-brew tap chrisjrex/vtt
-brew install vtt
-```
-
-### Install Script
-
-For a manual installation without npm:
+**Recommended** - Includes Python 3.11 and all dependencies:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main/scripts/install.sh | bash
 ```
 
-Or download the install script and run it:
+Or download and run manually:
 
 ```bash
 curl -sSL -o install-vtt.sh https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main/scripts/install.sh
 chmod +x install-vtt.sh
 ./install-vtt.sh
+```
+
+This installs to `~/.local/` and includes a bundled Python runtime.
+
+### Option 2: NPM (System Python)
+
+If you already have Python 3.10+ and sox installed:
+
+```bash
+npm install -g @vtt/cli
+```
+
+**Prerequisites:**
+```bash
+brew install python sox
+```
+
+### Option 3: Homebrew
+
+```bash
+brew tap chrisjrex/vtt
+brew install vtt
 ```
 
 ## Quick Start
@@ -329,27 +336,39 @@ fi
   # Then install prerequisites (see cli-lite README)
   ```
 
-## Comparison with @vtt/cli-lite
+## Comparison
 
-| Feature | @vtt/cli (Bundled) | @vtt/cli-lite |
-|---------|-------------------|---------------|
-| **Download Size** | ~50MB | ~500KB |
-| **Setup Time** | Instant | 10-15 minutes |
-| **Dependencies** | None | sox, Python, pip packages |
-| **Python Version** | Bundled 3.11 | Your choice (3.10+) |
-| **Disk Usage** | ~150MB total | ~50MB (shared with system) |
-| **Best For** | Quick start, general users | Developers, custom setups |
+| Feature | Install Script | NPM Package | @vtt/cli-lite |
+|---------|---------------|-------------|---------------|
+| **Download Size** | ~300MB | ~36KB | ~500KB |
+| **Setup Time** | 2-3 minutes | Instant* | 10-15 minutes |
+| **Dependencies** | Node.js only | Python 3.10+, sox | Python 3.10+, sox |
+| **Python Version** | Bundled 3.11 | System Python | Your choice (3.10+) |
+| **Disk Usage** | ~1.1GB | Shared with system | ~50MB (shared) |
+| **Best For** | Quick start, no setup | Developers with Python | Custom setups |
+
+\* After npm install, run `vtt doctor` to check Python dependencies
 
 ## Uninstalling
+
+### Install Script Installation
+
+```bash
+rm -rf ~/.local/share/vtt/
+rm -f ~/.local/bin/vtt
+```
+
+### NPM Installation
 
 ```bash
 npm uninstall -g @vtt/cli
 
 # Remove data directory (optional)
-rm -rf ~/.local/share/vtt/
+rm -rf ~/.cache/VoiceToText/
 ```
 
-Homebrew:
+### Homebrew
+
 ```bash
 brew uninstall vtt
 ```

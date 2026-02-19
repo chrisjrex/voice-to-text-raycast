@@ -44,7 +44,7 @@ curl -sSL "$CLI_URL" -o "/tmp/vtt-cli-$VERSION.tgz"
 
 # Download runtime  
 echo "Downloading VTT Runtime..."
-RUNTIME_URL="https://github.com/$REPO/releases/download/v$VERSION/vtt-runtime-3.11.9-macos-arm64.tar.gz"
+RUNTIME_URL="https://github.com/$REPO/releases/download/v$VERSION/vtt-runtime-3.11-macos-arm64.tar.gz"
 curl -sSL "$RUNTIME_URL" -o "/tmp/vtt-runtime.tar.gz"
 
 # Extract CLI
