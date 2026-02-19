@@ -54,7 +54,7 @@ function getBundledPythonPath(): string | undefined {
   // Check multiple possible locations for bundled runtime
   const possiblePaths = [
     // Extracted runtime location (from standalone binary)
-    join(homedir(), ".local", "share", "vtt", "runtime", "bin", "python3"),
+    join(homedir(), ".local", "share", "voicekit", "runtime", "bin", "python3"),
     // From installed npm package
     join(__dirname, "../../../assets/runtime/bin/python3"),
     // From development environment
@@ -77,7 +77,7 @@ function getBundledPythonPath(): string | undefined {
 function getBundledSoxPath(): string | undefined {
   const possiblePaths = [
     // Extracted runtime location (from standalone binary)
-    join(homedir(), ".local", "share", "vtt", "runtime", "bin", "sox"),
+    join(homedir(), ".local", "share", "voicekit", "runtime", "bin", "sox"),
     join(__dirname, "../../../assets/runtime/bin/sox"),
     join(__dirname, "../../cli/assets/runtime/bin/sox"),
     join(process.cwd(), "assets/runtime/bin/sox"),

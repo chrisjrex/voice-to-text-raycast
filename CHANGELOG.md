@@ -1,4 +1,4 @@
-# Voice-To-Text Changelog
+# VoiceKit Changelog
 
 ## [Initial Version] - 2026-02-15
 

@@ -17,33 +17,33 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-    
+
     - name: Install dependencies
       run: |
         brew install pkg-config libtool sox
-    
+
     - name: Build runtime
       run: |
         export PYTHON_VERSION="${{ github.event.inputs.python_version || '3.11.9' }}"
         ./scripts/build-runtime.sh
-    
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: vtt-runtime-macos-arm64
-        path: vtt-runtime-*.tar.gz
+        name: voicekit-runtime-macos-arm64
+        path: voicekit-runtime-*.tar.gz
         retention-days: 30
-    
+
     - name: Upload to Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: vtt-runtime-*.tar.gz
+        files: voicekit-runtime-*.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -51,20 +51,20 @@ jobs:
     needs: build-macos-arm64
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    
+
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
         path: artifacts
-        pattern: vtt-runtime-macos-*
-    
+        pattern: voicekit-runtime-macos-*
+
     - name: Create Release Notes
       run: |
         cat > RELEASE_NOTES.md << 'EOF'
-        # VTT Python Runtime
+        # VoiceKit Python Runtime
 
-        Self-contained Python 3.11 runtime with all dependencies for VTT CLI.
+        Self-contained Python 3.11 runtime with all dependencies for VoiceKit CLI.
 
         ## Contents
         - Python 3.11.9
@@ -79,14 +79,14 @@ jobs:
 
         ## Usage
 
-        ### For @vtt/cli (bundled version)
+        ### For @voicekit/cli (bundled version)
         This runtime is automatically included when you install via npm:
         ```bash
-        npm install -g @vtt/cli
+        npm install -g @voicekit/cli
         ```
 
         ### For manual installation
-        Download for your architecture and extract to VTT data directory.
+        Download for your architecture and extract to VoiceKit data directory.
 
         ## Architectures
         - arm64: Apple Silicon (M1/M2/M3)
@@ -95,7 +95,7 @@ jobs:
         - Download: ~45-50MB (compressed)
         - Installed: ~150MB
         EOF
-    
+
     - name: Update Release
       uses: softprops/action-gh-release@v1
       with:

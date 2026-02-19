@@ -1,5 +1,5 @@
 /**
- * VTT Core Library
+ * VoiceKit Core Library
  * Voice-to-text and text-to-speech functionality
  */
 

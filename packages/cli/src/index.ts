@@ -900,7 +900,7 @@ if not running:
 print("Transcribing...", flush=True)
 
 transcribe_proc = subprocess.run(
-    [sys.executable, "-m", "vtt", "transcribe", "record", "-i", audio_path, "-o", OUTPUT_PATH, "-f", "json"],
+    [sys.executable, "-m", "voicekit", "transcribe", "record", "-i", audio_path, "-o", OUTPUT_PATH, "-f", "json"],
     capture_output=True, text=True, timeout=300
 )
 
@@ -1896,7 +1896,7 @@ program
       };
       
       // Print header
-      console.log("\nVTT Doctor - System Health Check");
+      console.log("\nVoiceKit Doctor - System Health Check");
       console.log("══════════════════════════════════════════════════");
       
       let tablesOutput = "";
@@ -2401,11 +2401,11 @@ program
   .action(() => {
     console.log(`
 ╔════════════════════════════════════════════════════════════════╗
-║                    VTT - VoiceKit CLI                     ║
+║                    VoiceKit CLI                     ║
 ║            Local Speech-to-Text & Text-to-Speech               ║
 ╚════════════════════════════════════════════════════════════════╝
 
-VTT is a composable Unix CLI for local speech recognition and synthesis
+VoiceKit is a composable Unix CLI for local speech recognition and synthesis
 using Apple MLX. All processing happens on-device - no cloud APIs.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2709,12 +2709,12 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
     $ voicekit speak -f report.txt -e kokoro -v Heart --speed 1.3
 
   Chain commands (transcribe and read back):
-    $ TEXT=$(vtt transcribe --silence-timeout 10 --quiet)
+    $ TEXT=$(voicekit transcribe --silence-timeout 10 --quiet)
     $ echo "You said: $TEXT" | voicekit speak -e system -v Samantha
 
   Script automation:
     #!/bin/bash
-    RESULT=$(vtt transcribe --silence-timeout 5 --format json)
+    RESULT=$(voicekit transcribe --silence-timeout 5 --format json)
     TEXT=$(echo $RESULT | jq -r '.text')
     echo "Transcribed: $TEXT"
 

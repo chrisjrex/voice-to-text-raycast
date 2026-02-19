@@ -1,8 +1,8 @@
-# VTT Dual-Version Implementation Summary
+# VoiceKit Dual-Version Implementation Summary
 
 ## Overview
 
-Successfully implemented a dual-version setup for VTT CLI with bundled and lite variants.
+Successfully implemented a dual-version setup for VoiceKit CLI with bundled and lite variants.
 
 ## What Was Implemented
 
@@ -12,11 +12,11 @@ Successfully implemented a dual-version setup for VTT CLI with bundled and lite 
 voice-to-text-raycast/
 ├── packages/
 │   ├── core/                    # Shared logic (updated)
-│   ├── cli/                     # @vtt/cli (bundled version)
+│   ├── cli/                     # @voicekit/cli (bundled version)
 │   │   ├── assets/runtime/      # Bundled Python 3.11 runtime (placeholder)
 │   │   ├── package.json         # Updated with bundled metadata
 │   │   └── README.md            # Bundled version documentation
-│   └── cli-lite/                # @vtt/cli-lite (system deps version)
+│   └── cli-lite/                # @voicekit/cli-lite (system deps version)
 │       ├── package.json
 │       ├── README.md            # Clear prerequisites
 │       └── build.sh             # Build script
@@ -25,8 +25,8 @@ voice-to-text-raycast/
 ├── .github/workflows/
 │   └── build-runtime.yml        # GitHub Actions for CI/CD
 ├── homebrew/
-│   ├── vtt.rb                   # Bundled formula
-│   ├── vtt-lite.rb              # Lite formula
+│   ├── voicekit.rb              # Bundled formula
+│   ├── voicekit-lite.rb         # Lite formula
 │   └── README.md
 ├── INSTALL.md                   # Updated with dual-version guide
 └── README.md                    # Updated installation section
@@ -60,12 +60,12 @@ Updated doctor command:
 ### 4. Doctor Command Output (New Format)
 
 ```
-VTT Doctor - System Health Check
+VoiceKit Doctor - System Health Check
 ══════════════════════════════════════════════════
 
 Runtime: ✓ Bundled (self-contained)
-  Python: /Users/.../.local/share/vtt/runtime/bin/python3
-  Data: /Users/.../.local/share/vtt ✓
+  Python: /Users/.../.local/share/voicekit/runtime/bin/python3
+  Data: /Users/.../.local/share/voicekit ✓
 
 Dependencies:
   Component  Status
@@ -125,17 +125,17 @@ Features:
 
 ### 7. Homebrew Formulas
 
-**vtt.rb** (Bundled):
+**voicekit.rb** (Bundled):
 - Downloads runtime from GitHub releases
 - Installs npm package
-- Creates wrapper script with VTT_RUNTIME_PATH
-- Includes vtt-uninstall helper
+- Creates wrapper script with VOICEKIT_RUNTIME_PATH
+- Includes voicekit-uninstall helper
 
-**vtt-lite.rb** (Lite):
+**voicekit-lite.rb** (Lite):
 - Depends on sox, python@3.11
 - Checks for Python packages on first run
 - Warns if mlx_whisper/parakeet_mlx not installed
-- Includes vtt-uninstall helper
+- Includes voicekit-uninstall helper
 
 ### 8. Documentation
 
@@ -169,37 +169,37 @@ Features:
 
 ```bash
 # Bundled (recommended)
-npm install -g @vtt/cli
+npm install -g @voicekit/cli
 
 # Lite (system deps)
-npm install -g @vtt/cli-lite
+npm install -g @voicekit/cli-lite
 ```
 
 ### Homebrew
 
 ```bash
 # Add tap
-brew tap chrisjrex/vtt
+brew tap chrisjrex/voicekit
 
 # Install bundled
-brew install vtt
+brew install voicekit
 
 # Install lite
-brew install vtt-lite
+brew install voicekit-lite
 ```
 
 ### GitHub Releases
 
 ```bash
 # Download pre-built binary
-curl -sSL https://github.com/chrisjrex/voice-to-text-raycast/releases/download/v1.0.0/vtt-macos-arm64.tar.gz | tar xz
-sudo mv vtt /usr/local/bin/
+curl -sSL https://github.com/chrisjrex/voice-to-text-raycast/releases/download/v1.0.0/voicekit-macos-arm64.tar.gz | tar xz
+sudo mv voicekit /usr/local/bin/
 ```
 
 ## Key Design Decisions
 
-1. **Single CLI Name**: Both packages provide `vtt` command - no confusion for users
-2. **Environment Override**: VTT_PYTHON_PATH and friends always take precedence, enabling custom setups even with bundled version
+1. **Single CLI Name**: Both packages provide `voicekit` command - no confusion for users
+2. **Environment Override**: VOICEKIT_PYTHON_PATH and friends always take precedence, enabling custom setups even with bundled version
 3. **Clean Doctor Output**: Only shows relevant information based on what's configured
 4. **Python 3.11**: Pinned version that supports all engines (mlx-whisper, parakeet, piper, kokoro)
 5. **No Models Bundled**: Users download only what they need, keeping initial install small
@@ -210,8 +210,8 @@ sudo mv vtt /usr/local/bin/
 1. **Build and upload runtime** to GitHub releases:
    ```bash
    ./scripts/build-runtime.sh
-   # Upload vtt-runtime-3.11.9-macos-arm64.tar.gz
-   # Upload vtt-runtime-3.11.9-macos-x86_64.tar.gz
+   # Upload voicekit-runtime-3.11.9-macos-arm64.tar.gz
+   # Upload voicekit-runtime-3.11.9-macos-x86_64.tar.gz
    ```
 
 2. **Update SHA256 hashes** in Homebrew formulas
@@ -239,8 +239,8 @@ sudo mv vtt /usr/local/bin/
 - packages/cli/assets/runtime/ (directory)
 - scripts/build-runtime.sh
 - .github/workflows/build-runtime.yml
-- homebrew/vtt.rb
-- homebrew/vtt-lite.rb
+- homebrew/voicekit.rb
+- homebrew/voicekit-lite.rb
 - homebrew/README.md
 
 **Modified Files:**
@@ -254,7 +254,7 @@ sudo mv vtt /usr/local/bin/
 
 ## Summary
 
-✅ **Complete implementation** of dual-version VTT setup
+✅ **Complete implementation** of dual-version VoiceKit setup
 ✅ **Bundled version** ready for npm/Homebrew distribution
 ✅ **Lite version** with clear prerequisites
 ✅ **CI/CD pipeline** for automated runtime builds

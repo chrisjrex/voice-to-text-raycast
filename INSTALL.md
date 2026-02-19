@@ -1,6 +1,6 @@
 # Installation Guide
 
-VTT (Voice-to-Text) offers multiple installation methods to suit different needs.
+VoiceKit offers multiple installation methods to suit different needs.
 
 ## Choose Your Installation
 
@@ -10,7 +10,7 @@ VTT (Voice-to-Text) offers multiple installation methods to suit different needs
 
 **What you get:**
 - Bundled Python 3.11 runtime with all packages
-- VTT CLI tool
+- VoiceKit CLI tool
 - Everything extracted to `~/.local/`
 
 **Install:**
@@ -20,9 +20,9 @@ curl -sSL https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main
 
 **Or download and run manually:**
 ```bash
-curl -sSL -o install-vtt.sh https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main/scripts/install.sh
-chmod +x install-vtt.sh
-./install-vtt.sh
+curl -sSL -o install-voicekit.sh https://raw.githubusercontent.com/chrisjrex/voice-to-text-raycast/main/scripts/install.sh
+chmod +x install-voicekit.sh
+./install-voicekit.sh
 ```
 
 **Size:** ~300MB download, ~1.1GB installed
@@ -34,7 +34,7 @@ chmod +x install-vtt.sh
 **Best for:** Developers who already have Python 3.10+ installed
 
 **What you get:**
-- VTT CLI tool
+- VoiceKit CLI tool
 - Uses your system Python and dependencies
 
 **Prerequisites:**
@@ -45,7 +45,7 @@ pip3 install mlx-whisper parakeet-mlx piper-tts kokoro
 
 **Install:**
 ```bash
-npm install -g @vtt/cli
+npm install -g @voicekit/cli
 ```
 
 **Size:** ~36KB download
@@ -57,8 +57,8 @@ npm install -g @vtt/cli
 **Best for:** Homebrew users
 
 ```bash
-brew tap chrisjrex/vtt
-brew install vtt
+brew tap chrisjrex/voicekit
+brew install voicekit
 ```
 
 ---
@@ -68,7 +68,7 @@ brew install vtt
 **Best for:** Minimalists, those who want full control over dependencies
 
 **What you get:**
-- VTT CLI tool only (~500KB)
+- VoiceKit CLI tool only (~500KB)
 - Uses your system Python and dependencies
 
 **Prerequisites:**
@@ -91,13 +91,13 @@ python3.11 -m venv ~/.local/lib-kokoro/venv
 
 **Install via NPM:**
 ```bash
-npm install -g @vtt/cli-lite
+npm install -g @voicekit/cli-lite
 ```
 
 **Or via Homebrew:**
 ```bash
-brew tap chrisjrex/vtt
-brew install vtt-lite
+brew tap chrisjrex/voicekit
+brew install voicekit-lite
 ```
 
 **Size:** ~500KB download
@@ -110,29 +110,29 @@ After installation:
 
 ```bash
 # Verify installation
-vtt doctor
+voicekit doctor
 
 # List available resources
-vtt models list
-vtt voices list
+voicekit models list
+voicekit voices list
 
 # Download a speech-to-text model
-vtt models download whisper-tiny
+voicekit models download whisper-tiny
 
 # Download a text-to-speech voice
-vtt voices download Heart
+voicekit voices download Heart
 
-# Start using VTT
-vtt transcribe          # Record and transcribe
-vtt speak "Hello world" # Text-to-speech
+# Start using VoiceKit
+voicekit transcribe          # Record and transcribe
+voicekit speak "Hello world" # Text-to-speech
 ```
 
 ---
 
 ## Comparison
 
-| Feature | Install Script | NPM (`@vtt/cli`) | Lite (`@vtt/cli-lite`) |
-|---------|---------------|------------------|----------------------|
+| Feature | Install Script | NPM (`@voicekit/cli`) | Lite (`@voicekit/cli-lite`) |
+|---------|---------------|----------------------|----------------------------|
 | **Setup time** | 2-3 minutes | Instant* | 10-15 minutes |
 | **Download size** | ~300MB | ~36KB | ~500KB |
 | **Disk usage** | ~1.1GB | Shared with system | ~50MB (shared) |
@@ -141,7 +141,7 @@ vtt speak "Hello world" # Text-to-speech
 | **Offline use** | ✅ Yes | ✅ Yes | ✅ Yes (after setup) |
 | **Best for** | Quick start | Developers | Minimalists, custom setups |
 
-\* After npm install, run `vtt doctor` to verify Python dependencies
+\* After npm install, run `voicekit doctor` to verify Python dependencies
 
 ---
 
@@ -149,17 +149,17 @@ vtt speak "Hello world" # Text-to-speech
 
 ```bash
 # From install script to npm
-rm -rf ~/.local/share/vtt ~/.local/bin/vtt
-npm install -g @vtt/cli
+rm -rf ~/.local/share/voicekit ~/.local/bin/voicekit
+npm install -g @voicekit/cli
 
 # From npm to install script
-npm uninstall -g @vtt/cli
+npm uninstall -g @voicekit/cli
 # Then run install script
 
 # Switch to lite version
-npm uninstall -g @vtt/cli
-npm install -g @vtt/cli-lite
-# Then install prerequisites (see vtt doctor)
+npm uninstall -g @voicekit/cli
+npm install -g @voicekit/cli-lite
+# Then install prerequisites (see voicekit doctor)
 ```
 
 ---
@@ -168,28 +168,28 @@ npm install -g @vtt/cli-lite
 
 ### Install Script Installation
 ```bash
-rm -rf ~/.local/share/vtt
-rm -f ~/.local/bin/vtt
+rm -rf ~/.local/share/voicekit
+rm -f ~/.local/bin/voicekit
 ```
 
 ### NPM Installation
 ```bash
-npm uninstall -g @vtt/cli
+npm uninstall -g @voicekit/cli
 # Remove data directory
-rm -rf ~/.cache/VoiceToText/
+rm -rf ~/.cache/VoiceKit/
 ```
 
 ### Lite Version
 ```bash
-npm uninstall -g @vtt/cli-lite
+npm uninstall -g @voicekit/cli-lite
 # Remove data directory
-rm -rf ~/.cache/VoiceToText/
+rm -rf ~/.cache/VoiceKit/
 ```
 
 ### Homebrew (any version)
 ```bash
-brew uninstall vtt     # or vtt-lite
-brew untap chrisjrex/vtt  # Optional: remove tap
+brew uninstall voicekit     # or voicekit-lite
+brew untap chrisjrex/voicekit  # Optional: remove tap
 ```
 
 ---
@@ -205,7 +205,7 @@ brew untap chrisjrex/vtt  # Optional: remove tap
 
 ## Troubleshooting
 
-### "vtt: command not found"
+### "voicekit: command not found"
 
 **Install script:** Add to PATH:
 ```bash
@@ -221,9 +221,9 @@ export PATH="$PATH:$(npm config get prefix)/bin"
 
 Fix data directory permissions:
 ```bash
-chmod -R 755 ~/.local/share/vtt
+chmod -R 755 ~/.local/share/voicekit
 # or
-chmod -R 755 ~/.cache/VoiceToText/
+chmod -R 755 ~/.cache/VoiceKit/
 ```
 
 ### Missing Python packages (npm/lite versions only)
@@ -239,12 +239,12 @@ Install setproctitle:
 ```bash
 pip3 install setproctitle
 ```
-Then restart the daemon: `vtt transcribe stop && vtt transcribe start`
+Then restart the daemon: `voicekit transcribe stop && voicekit transcribe start`
 
 ### Check what's installed
 
 ```bash
-vtt doctor
+voicekit doctor
 ```
 
 ---
@@ -259,5 +259,5 @@ vtt doctor
 
 ## Questions?
 
-- **Quick help:** `vtt help-all`
+- **Quick help:** `voicekit help-all`
 - **GitHub Issues:** https://github.com/chrisjrex/voice-to-text-raycast/issues
