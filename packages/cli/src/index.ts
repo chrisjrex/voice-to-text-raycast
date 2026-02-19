@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * VTT CLI - Voice-to-Text CLI
+ * VoiceKit CLI
  * A composable Unix tool for local speech-to-text and text-to-speech
  */
 
@@ -34,7 +34,7 @@ import {
   type RecordingResult,
   type LaunchAgentConfig,
   ExitCodes
-} from "@vtt/core";
+} from "@voicekit/core";
 import { join, dirname } from "path";
 
 let spinnerInterval: NodeJS.Timeout | null = null;
@@ -89,15 +89,15 @@ function cleanupRecordingsDir(dirPath: string): void {
 }
 
 function shouldAutoCleanRecordings(): boolean {
-  return process.env.VTT_AUTO_CLEAN_RECORDINGS !== "false";
+  return process.env.VOICEKIT_AUTO_CLEAN_RECORDINGS !== "false";
 }
 
 function getTtsRecordingsPath(config: { dataDir: string }): string {
-  return process.env.VTT_TTS_RECORDINGS_PATH || join(config.dataDir, "tts", "recordings");
+  return process.env.VOICEKIT_TTS_RECORDINGS_PATH || join(config.dataDir, "tts", "recordings");
 }
 
 function getSttRecordingsPath(config: { dataDir: string }): string {
-  return process.env.VTT_STT_RECORDINGS_PATH || join(config.dataDir, "stt", "recordings");
+  return process.env.VOICEKIT_STT_RECORDINGS_PATH || join(config.dataDir, "stt", "recordings");
 }
 
 const program = new Command();
@@ -123,7 +123,7 @@ async function downloadKokoroVoice(pythonPath: string, voiceId: string): Promise
   const { tmpdir } = require("os");
   
   const langCode = voiceId.charAt(0);
-  const tempWav = join(tmpdir(), `vtt_download_${Date.now()}.wav`);
+  const tempWav = join(tmpdir(), `voicekit_download_${Date.now()}.wav`);
   const script = `
 import sys, json, numpy as np, soundfile as sf
 from kokoro import KPipeline
@@ -160,8 +160,8 @@ print("ok")
 }
 
 program
-  .name("vtt")
-  .description("Voice-to-Text CLI - Local STT and TTS\n\nRun 'vtt help-all' for comprehensive documentation")
+  .name("voicekit")
+  .description("VoiceKit CLI - Local STT and TTS\n\nRun 'voicekit help-all' for comprehensive documentation")
   .version("1.0.0")
   .option("--verbose", "Show detailed output for all operations");
 
@@ -171,7 +171,7 @@ program
   .description("Convert text to speech")
   .option("-f, --file <path>", "Read text from file")
   .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
-  .option("-v, --voice <name>", "Voice alias (e.g., Heart, Amy, Samantha)", process.env.VTT_DEFAULT_TTS_VOICE || "Samantha")
+  .option("-v, --voice <name>", "Voice alias (e.g., Heart, Amy, Samantha)", process.env.VOICEKIT_DEFAULT_TTS_VOICE || "Samantha")
   .option("-s, --speed <factor>", "Playback speed factor (0.5-3.0)", "1.0")
   .option("-o, --output <path>", "Save to file instead of playing")
   .option("-q, --quiet", "Suppress non-error output")
@@ -204,9 +204,9 @@ program
     } else {
       console.error("Error: No text provided. Use --file, provide text as argument, or pipe via stdin.");
       console.error("Examples:");
-      console.error('  vtt speak "Hello world"');
-      console.error('  vtt speak -f file.txt');
-      console.error('  echo "Hello" | vtt speak');
+      console.error('  voicekit speak "Hello world"');
+      console.error('  voicekit speak -f file.txt');
+      console.error('  echo "Hello" | voicekit speak');
       process.exit(1);
     }
 
@@ -218,13 +218,13 @@ program
     }
 
     // Engine is required - from command line, config, or environment variable
-    const engineName = options.engine || config.defaultTTSEngine || process.env.VTT_DEFAULT_TTS_ENGINE;
+    const engineName = options.engine || config.defaultTTSEngine || process.env.VOICEKIT_DEFAULT_TTS_ENGINE;
 
     if (!engineName) {
       console.error(`Error: --engine is required for speaking.`);
-      console.error(`Usage: vtt speak "Hello" --engine <piper|kokoro|system>`);
-      console.error(`Or set VTT_DEFAULT_TTS_ENGINE environment variable.`);
-      console.error(`Run 'vtt voices list' to see available voices and their engines.`);
+      console.error(`Usage: voicekit speak "Hello" --engine <piper|kokoro|system>`);
+      console.error(`Or set VOICEKIT_DEFAULT_TTS_ENGINE environment variable.`);
+      console.error(`Run 'voicekit voices list' to see available voices and their engines.`);
       process.exit(ExitCodes.GENERAL_ERROR);
     }
 
@@ -232,7 +232,7 @@ program
     const voice = getVoiceByAliasAndEngine(options.voice, engineName);
     if (!voice) {
       console.error(`Error: Unknown voice "${options.voice}" for engine "${engineName}"`);
-      console.error(`Run 'vtt voices list' to see available voices.`);
+      console.error(`Run 'voicekit voices list' to see available voices.`);
       process.exit(ExitCodes.UNKNOWN_VOICE);
     }
     
@@ -249,7 +249,7 @@ program
         const isDownloaded = engine.isVoiceDownloaded(voice, config);
         if (!isDownloaded) {
           console.error(`Error: Voice "${options.voice}" (${voice.provider}) not downloaded.`);
-          console.error(`Run: vtt voices download ${options.voice} --engine ${voice.provider}`);
+          console.error(`Run: voicekit voices download ${options.voice} --engine ${voice.provider}`);
           process.exit(3);
         }
       }
@@ -409,7 +409,7 @@ voicesCmd
 
 voicesCmd
   .command("download <voice>")
-  .description("Download a voice by alias (requires --engine or VTT_DEFAULT_TTS_ENGINE)")
+  .description("Download a voice by alias (requires --engine or VOICEKIT_DEFAULT_TTS_ENGINE)")
   .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
   .option("--verbose", "Show detailed output for all operations")
   .action(async (voiceAlias: string, options: { engine?: string; verbose?: boolean }) => {
@@ -419,13 +419,13 @@ voicesCmd
     const { existsSync, mkdirSync } = require("fs");
 
     // Engine is required - from command line, config, or environment variable
-    const engineName = options.engine || config.defaultTTSEngine || process.env.VTT_DEFAULT_TTS_ENGINE;
+    const engineName = options.engine || config.defaultTTSEngine || process.env.VOICEKIT_DEFAULT_TTS_ENGINE;
 
     if (!engineName) {
       console.error(`Error: --engine is required for downloading voices.`);
-      console.error(`Usage: vtt voices download ${voiceAlias} --engine <piper|kokoro>`);
-      console.error(`Or set VTT_DEFAULT_TTS_ENGINE environment variable.`);
-      console.error(`Run 'vtt voices list' to see available voices and their engines.`);
+      console.error(`Usage: voicekit voices download ${voiceAlias} --engine <piper|kokoro>`);
+      console.error(`Or set VOICEKIT_DEFAULT_TTS_ENGINE environment variable.`);
+      console.error(`Run 'voicekit voices list' to see available voices and their engines.`);
       process.exit(ExitCodes.GENERAL_ERROR);
     }
 
@@ -434,7 +434,7 @@ voicesCmd
 
     if (!voice) {
       console.error(`Error: Unknown voice "${voiceAlias}" for engine "${engineName}"`);
-      console.error(`Run 'vtt voices list' to see available voices.`);
+      console.error(`Run 'voicekit voices list' to see available voices.`);
       process.exit(ExitCodes.UNKNOWN_VOICE);
     }
 
@@ -451,7 +451,7 @@ voicesCmd
     
     if (!engineAvailable) {
       const requiredPackage = voice.provider === "piper" ? "piper-tts" : "kokoro";
-      const askPermission = process.env.VTT_ASK_PERMISSION !== "false";
+      const askPermission = process.env.VOICEKIT_ASK_PERMISSION !== "false";
       
       if (askPermission) {
         // Interactive mode - ask for permission
@@ -469,13 +469,13 @@ voicesCmd
         
         if (answer.toLowerCase() !== "y" && answer.toLowerCase() !== "yes") {
           console.log("Installation cancelled.");
-          console.log(`To skip this prompt in the future, set VTT_ASK_PERMISSION=false`);
+          console.log(`To skip this prompt in the future, set VOICEKIT_ASK_PERMISSION=false`);
           process.exit(ExitCodes.GENERAL_ERROR);
         }
       } else {
         // Headless mode - auto-install
         if (verbose) {
-          console.log(`VTT_ASK_PERMISSION=false: Auto-installing ${requiredPackage}...`);
+          console.log(`VOICEKIT_ASK_PERMISSION=false: Auto-installing ${requiredPackage}...`);
         }
       }
       
@@ -545,7 +545,7 @@ voicesCmd
       }
       
       if (!process.env.HF_TOKEN) {
-        process.env.HF_TOKEN = process.env.VTT_HF_TOKEN;
+        process.env.HF_TOKEN = process.env.VOICEKIT_HF_TOKEN;
       }
       
       const script = `
@@ -597,10 +597,10 @@ print(path)
       });
       
     } else if (voice.provider === "kokoro") {
-      const kokoroPythonPath = config.kokoroPythonPath || process.env.VTT_KOKORO_PYTHON_PATH;
+      const kokoroPythonPath = config.kokoroPythonPath || process.env.VOICEKIT_KOKORO_PYTHON_PATH;
       if (!kokoroPythonPath) {
         console.error(`Error: Kokoro Python path not configured.`);
-        console.error(`Set VTT_KOKORO_PYTHON_PATH or run 'vtt doctor' to diagnose.`);
+        console.error(`Set VOICEKIT_KOKORO_PYTHON_PATH or run 'voicekit doctor' to diagnose.`);
         process.exit(ExitCodes.CONFIG_ERROR);
       }
       
@@ -629,19 +629,19 @@ print(path)
 
 voicesCmd
   .command("delete <voice>")
-  .description("Delete a downloaded voice (requires --engine or VTT_DEFAULT_TTS_ENGINE)")
+  .description("Delete a downloaded voice (requires --engine or VOICEKIT_DEFAULT_TTS_ENGINE)")
   .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
   .action(async (voiceAlias: string, options: { engine?: string }) => {
     const config = loadConfig();
 
     // Engine is required - from command line, config, or environment variable
-    const engineName = options.engine || config.defaultTTSEngine || process.env.VTT_DEFAULT_TTS_ENGINE;
+    const engineName = options.engine || config.defaultTTSEngine || process.env.VOICEKIT_DEFAULT_TTS_ENGINE;
 
     if (!engineName) {
       console.error(`Error: --engine is required for deleting voices.`);
-      console.error(`Usage: vtt voices delete ${voiceAlias} --engine <piper|kokoro>`);
-      console.error(`Or set VTT_DEFAULT_TTS_ENGINE environment variable.`);
-      console.error(`Run 'vtt voices list' to see available voices and their engines.`);
+      console.error(`Usage: voicekit voices delete ${voiceAlias} --engine <piper|kokoro>`);
+      console.error(`Or set VOICEKIT_DEFAULT_TTS_ENGINE environment variable.`);
+      console.error(`Run 'voicekit voices list' to see available voices and their engines.`);
       process.exit(ExitCodes.GENERAL_ERROR);
     }
 
@@ -650,7 +650,7 @@ voicesCmd
 
     if (!voice) {
       console.error(`Error: Unknown voice "${voiceAlias}" for engine "${engineName}"`);
-      console.error(`Run 'vtt voices list' to see available voices.`);
+      console.error(`Run 'voicekit voices list' to see available voices.`);
       process.exit(ExitCodes.UNKNOWN_VOICE);
     }
 
@@ -668,20 +668,20 @@ voicesCmd
 
 voicesCmd
   .command("preview <voice>")
-  .description("Preview a voice (requires --engine or VTT_DEFAULT_TTS_ENGINE)")
+  .description("Preview a voice (requires --engine or VOICEKIT_DEFAULT_TTS_ENGINE)")
   .option("-e, --engine <engine>", "TTS engine (piper, kokoro, system)")
   .option("-s, --speed <factor>", "Playback speed factor (0.5-3.0)", "1.0")
   .action(async (voiceAlias: string, options: { engine?: string; speed: string }) => {
     const config = loadConfig();
 
     // Engine is required - from command line, config, or environment variable
-    const engineName = options.engine || config.defaultTTSEngine || process.env.VTT_DEFAULT_TTS_ENGINE;
+    const engineName = options.engine || config.defaultTTSEngine || process.env.VOICEKIT_DEFAULT_TTS_ENGINE;
 
     if (!engineName) {
       console.error(`Error: --engine is required for previewing voices.`);
-      console.error(`Usage: vtt voices preview ${voiceAlias} --engine <piper|kokoro|system>`);
-      console.error(`Or set VTT_DEFAULT_TTS_ENGINE environment variable.`);
-      console.error(`Run 'vtt voices list' to see available voices and their engines.`);
+      console.error(`Usage: voicekit voices preview ${voiceAlias} --engine <piper|kokoro|system>`);
+      console.error(`Or set VOICEKIT_DEFAULT_TTS_ENGINE environment variable.`);
+      console.error(`Run 'voicekit voices list' to see available voices and their engines.`);
       process.exit(ExitCodes.GENERAL_ERROR);
     }
 
@@ -690,7 +690,7 @@ voicesCmd
 
     if (!voice) {
       console.error(`Error: Unknown voice "${voiceAlias}" for engine "${engineName}"`);
-      console.error(`Run 'vtt voices list' to see available voices.`);
+      console.error(`Run 'voicekit voices list' to see available voices.`);
       process.exit(ExitCodes.UNKNOWN_VOICE);
     }
 
@@ -705,7 +705,7 @@ voicesCmd
       const engine = getTTSEngine(voice);
       if (!engine.isVoiceDownloaded(voice, config)) {
         console.error(`Error: Voice "${voiceAlias}" (${voice.provider}) not downloaded.`);
-        console.error(`Run: vtt voices download ${voiceAlias} --engine ${voice.provider}`);
+        console.error(`Run: voicekit voices download ${voiceAlias} --engine ${voice.provider}`);
         process.exit(3);
       }
     }
@@ -743,7 +743,7 @@ const transcribeCmd = program
   .command("transcribe")
   .description("Record and transcribe speech to text")
   .action(async () => {
-    console.log(`Usage: vtt transcribe [command]
+    console.log(`Usage: voicekit transcribe [command]
 
 Record and transcribe speech to text
 
@@ -755,21 +755,21 @@ Commands:
 
 Examples:
   # Start background recording (runs until stopped):
-  vtt transcribe start
+  voicekit transcribe start
 
   # Start with options:
-  vtt transcribe start --silence-timeout 15 -o result.json
+  voicekit transcribe start --silence-timeout 15 -o result.json
 
   # Stop background recording and transcribe:
-  vtt transcribe stop
+  voicekit transcribe stop
 
   # Check if daemon is running:
-  vtt transcribe status
+  voicekit transcribe status
 
   # Single session transcription:
-  vtt transcribe record
+  voicekit transcribe record
 
-Run 'vtt transcribe <command> --help' for more information on a command.`);
+Run 'voicekit transcribe <command> --help' for more information on a command.`);
   });
 
 transcribeCmd
@@ -785,15 +785,15 @@ transcribeCmd
     const outputPath = options.output || join(config.dataDir, "transcription.json");
     const { writeFileSync, existsSync, readFileSync, mkdirSync } = require("fs");
     
-    let modelAlias = options.model || config.defaultSTTModel || process.env.VTT_DEFAULT_STT_MODEL;
+    let modelAlias = options.model || config.defaultSTTModel || process.env.VOICEKIT_DEFAULT_STT_MODEL;
     if (!modelAlias) {
       console.error("Error: No model specified.");
       console.error("Either:");
-      console.error("  1. Use -m/--model flag: vtt transcribe start -m whisper-tiny");
-      console.error("  2. Set VTT_DEFAULT_STT_MODEL environment variable");
+      console.error("  1. Use -m/--model flag: voicekit transcribe start -m whisper-tiny");
+      console.error("  2. Set VOICEKIT_DEFAULT_STT_MODEL environment variable");
       console.error("");
       console.error("Available models:");
-      console.error("  vtt models list");
+      console.error("  voicekit models list");
       process.exit(1);
     }
     
@@ -806,7 +806,7 @@ transcribeCmd
     const isRunning = await isLaunchAgentRunning(TRANSCRIBE_DAEMON_LABEL);
     if (isRunning) {
       console.error("Error: Transcription daemon is already running");
-      console.error("Use 'vtt transcribe stop' to stop it first.");
+      console.error("Use 'voicekit transcribe stop' to stop it first.");
       process.exit(1);
     }
     
@@ -829,7 +829,7 @@ except ImportError:
 
 OUTPUT_PATH = ${JSON.stringify(outputPath)}
 SOX_PATH = ${JSON.stringify(config.soxPath)}
-VTT_CLI_PATH = ${JSON.stringify(join(__dirname, ".."))}
+VOICEKIT_CLI_PATH = ${JSON.stringify(join(__dirname, ".."))}
 
 SILENCE_TIMEOUT = ${parseInt(options.silenceTimeout) || 0}
 SILENCE_THRESHOLD = ${parseFloat(options.silenceThreshold) || 0.02}
@@ -936,7 +936,7 @@ except:
         runAtLoad: false,
         keepAlive: false,
         environmentVariables: {
-          VTT_DATA_DIR: config.dataDir
+          VOICEKIT_DATA_DIR: config.dataDir
         }
       };
       await installLaunchAgent(launchAgentConfig);
@@ -1013,16 +1013,16 @@ transcribeCmd
     const config = loadConfig();
     const quiet = options.quiet || false;
     
-    // Check if model is provided or if VTT_DEFAULT_STT_MODEL is set
-    let modelAlias = options.model || config.defaultSTTModel || process.env.VTT_DEFAULT_STT_MODEL;
+    // Check if model is provided or if VOICEKIT_DEFAULT_STT_MODEL is set
+    let modelAlias = options.model || config.defaultSTTModel || process.env.VOICEKIT_DEFAULT_STT_MODEL;
     if (!modelAlias) {
       console.error("Error: No model specified.");
       console.error("Either:");
-      console.error("  1. Use -m/--model flag: vtt transcribe -m whisper-tiny");
-      console.error("  2. Set VTT_DEFAULT_STT_MODEL environment variable");
+      console.error("  1. Use -m/--model flag: voicekit transcribe -m whisper-tiny");
+      console.error("  2. Set VOICEKIT_DEFAULT_STT_MODEL environment variable");
       console.error("");
       console.error("Available models:");
-      console.error("  vtt models list");
+      console.error("  voicekit models list");
       process.exit(1);
     }
     
@@ -1030,7 +1030,7 @@ transcribeCmd
     const model = getModelByAlias(modelAlias);
     if (!model) {
       console.error(`Error: Unknown model "${modelAlias}"`);
-      console.error(`Run 'vtt models list' to see available models.`);
+      console.error(`Run 'voicekit models list' to see available models.`);
       process.exit(ExitCodes.UNKNOWN_MODEL);
     }
     
@@ -1088,7 +1088,7 @@ transcribeCmd
     // Check if model is downloaded
     if (!engine.isModelDownloaded(model)) {
       console.error(`Error: Model "${options.model}" not downloaded.`);
-      console.error(`Run: vtt models download ${options.model}`);
+      console.error(`Run: voicekit models download ${options.model}`);
       process.exit(3);
     }
     
@@ -1306,7 +1306,7 @@ modelsCmd
     
     if (!model) {
       console.error(`Error: Unknown model "${modelAlias}"`);
-      console.error(`Run 'vtt models list' to see available models.`);
+      console.error(`Run 'voicekit models list' to see available models.`);
       process.exit(ExitCodes.UNKNOWN_MODEL);
     }
     
@@ -1363,7 +1363,7 @@ modelsCmd
     }
     
     if (!process.env.HF_TOKEN) {
-      process.env.HF_TOKEN = process.env.VTT_HF_TOKEN;
+      process.env.HF_TOKEN = process.env.VOICEKIT_HF_TOKEN;
     }
     
     const script = `
@@ -1415,7 +1415,7 @@ modelsCmd
     
     if (!model) {
       console.error(`Error: Unknown model "${modelAlias}"`);
-      console.error(`Run 'vtt models list' to see available models.`);
+      console.error(`Run 'voicekit models list' to see available models.`);
       process.exit(ExitCodes.UNKNOWN_MODEL);
     }
     
@@ -1452,7 +1452,7 @@ const serverCmd = program
 serverCmd
   .command("start")
   .description("Start the Kokoro TTS server")
-  .option("-t, --timeout <seconds>", "Idle timeout in seconds", process.env.VTT_KOKORO_IDLE_TIMEOUT || "120")
+  .option("-t, --timeout <seconds>", "Idle timeout in seconds", process.env.VOICEKIT_KOKORO_IDLE_TIMEOUT || "120")
   .action(async (options) => {
     const config = loadConfig();
     const timeout = parseInt(options.timeout, 10);
@@ -1724,21 +1724,21 @@ program
     
     // Check which environment variables are actually set
     const configuredEnvVars: Record<string, string> = {};
-    if (process.env.VTT_PYTHON_PATH) configuredEnvVars.VTT_PYTHON_PATH = process.env.VTT_PYTHON_PATH;
-    if (process.env.VTT_KOKORO_PYTHON_PATH) configuredEnvVars.VTT_KOKORO_PYTHON_PATH = process.env.VTT_KOKORO_PYTHON_PATH;
-    if (process.env.VTT_SOX_PATH) configuredEnvVars.VTT_SOX_PATH = process.env.VTT_SOX_PATH;
-    if (process.env.VTT_DATA_DIR) configuredEnvVars.VTT_DATA_DIR = process.env.VTT_DATA_DIR;
-    if (process.env.VTT_KOKORO_SOCKET) configuredEnvVars.VTT_KOKORO_SOCKET = process.env.VTT_KOKORO_SOCKET;
-    if (process.env.VTT_KOKORO_IDLE_TIMEOUT) configuredEnvVars.VTT_KOKORO_IDLE_TIMEOUT = process.env.VTT_KOKORO_IDLE_TIMEOUT;
-    if (process.env.VTT_DEFAULT_STT_MODEL) configuredEnvVars.VTT_DEFAULT_STT_MODEL = process.env.VTT_DEFAULT_STT_MODEL;
-    if (process.env.VTT_DEFAULT_TTS_ENGINE) configuredEnvVars.VTT_DEFAULT_TTS_ENGINE = process.env.VTT_DEFAULT_TTS_ENGINE;
-    if (process.env.VTT_DEFAULT_TTS_VOICE) configuredEnvVars.VTT_DEFAULT_TTS_VOICE = process.env.VTT_DEFAULT_TTS_VOICE;
-    if (process.env.VTT_LOG_LEVEL) configuredEnvVars.VTT_LOG_LEVEL = process.env.VTT_LOG_LEVEL;
-    if (process.env.VTT_AUTO_CLEAN_RECORDINGS) configuredEnvVars.VTT_AUTO_CLEAN_RECORDINGS = process.env.VTT_AUTO_CLEAN_RECORDINGS;
-    if (process.env.VTT_TTS_RECORDINGS_PATH) configuredEnvVars.VTT_TTS_RECORDINGS_PATH = process.env.VTT_TTS_RECORDINGS_PATH;
-    if (process.env.VTT_STT_RECORDINGS_PATH) configuredEnvVars.VTT_STT_RECORDINGS_PATH = process.env.VTT_STT_RECORDINGS_PATH;
-    if (process.env.VTT_ASK_PERMISSION) configuredEnvVars.VTT_ASK_PERMISSION = process.env.VTT_ASK_PERMISSION;
-    if (process.env.VTT_HF_TOKEN) configuredEnvVars.VTT_HF_TOKEN = process.env.VTT_HF_TOKEN;
+    if (process.env.VOICEKIT_PYTHON_PATH) configuredEnvVars.VOICEKIT_PYTHON_PATH = process.env.VOICEKIT_PYTHON_PATH;
+    if (process.env.VOICEKIT_KOKORO_PYTHON_PATH) configuredEnvVars.VOICEKIT_KOKORO_PYTHON_PATH = process.env.VOICEKIT_KOKORO_PYTHON_PATH;
+    if (process.env.VOICEKIT_SOX_PATH) configuredEnvVars.VOICEKIT_SOX_PATH = process.env.VOICEKIT_SOX_PATH;
+    if (process.env.VOICEKIT_DATA_DIR) configuredEnvVars.VOICEKIT_DATA_DIR = process.env.VOICEKIT_DATA_DIR;
+    if (process.env.VOICEKIT_KOKORO_SOCKET) configuredEnvVars.VOICEKIT_KOKORO_SOCKET = process.env.VOICEKIT_KOKORO_SOCKET;
+    if (process.env.VOICEKIT_KOKORO_IDLE_TIMEOUT) configuredEnvVars.VOICEKIT_KOKORO_IDLE_TIMEOUT = process.env.VOICEKIT_KOKORO_IDLE_TIMEOUT;
+    if (process.env.VOICEKIT_DEFAULT_STT_MODEL) configuredEnvVars.VOICEKIT_DEFAULT_STT_MODEL = process.env.VOICEKIT_DEFAULT_STT_MODEL;
+    if (process.env.VOICEKIT_DEFAULT_TTS_ENGINE) configuredEnvVars.VOICEKIT_DEFAULT_TTS_ENGINE = process.env.VOICEKIT_DEFAULT_TTS_ENGINE;
+    if (process.env.VOICEKIT_DEFAULT_TTS_VOICE) configuredEnvVars.VOICEKIT_DEFAULT_TTS_VOICE = process.env.VOICEKIT_DEFAULT_TTS_VOICE;
+    if (process.env.VOICEKIT_LOG_LEVEL) configuredEnvVars.VOICEKIT_LOG_LEVEL = process.env.VOICEKIT_LOG_LEVEL;
+    if (process.env.VOICEKIT_AUTO_CLEAN_RECORDINGS) configuredEnvVars.VOICEKIT_AUTO_CLEAN_RECORDINGS = process.env.VOICEKIT_AUTO_CLEAN_RECORDINGS;
+    if (process.env.VOICEKIT_TTS_RECORDINGS_PATH) configuredEnvVars.VOICEKIT_TTS_RECORDINGS_PATH = process.env.VOICEKIT_TTS_RECORDINGS_PATH;
+    if (process.env.VOICEKIT_STT_RECORDINGS_PATH) configuredEnvVars.VOICEKIT_STT_RECORDINGS_PATH = process.env.VOICEKIT_STT_RECORDINGS_PATH;
+    if (process.env.VOICEKIT_ASK_PERMISSION) configuredEnvVars.VOICEKIT_ASK_PERMISSION = process.env.VOICEKIT_ASK_PERMISSION;
+    if (process.env.VOICEKIT_HF_TOKEN) configuredEnvVars.VOICEKIT_HF_TOKEN = process.env.VOICEKIT_HF_TOKEN;
     
     // Check dependencies
     const soxInstalled = await checkCommand(config.soxPath, ["--version"]);
@@ -2401,7 +2401,7 @@ program
   .action(() => {
     console.log(`
 ╔════════════════════════════════════════════════════════════════╗
-║                    VTT - Voice-to-Text CLI                     ║
+║                    VTT - VoiceKit CLI                     ║
 ║            Local Speech-to-Text & Text-to-Speech               ║
 ╚════════════════════════════════════════════════════════════════╝
 
@@ -2413,20 +2413,20 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   1. Check system health:
-     $ vtt doctor
+     $ voicekit doctor
 
   2. List available voices:
-     $ vtt voices list
+     $ voicekit voices list
 
    3. Download a voice:
-     $ vtt voices download Heart --engine kokoro
+     $ voicekit voices download Heart --engine kokoro
 
   4. Transcribe speech:
-     $ vtt transcribe
+     $ voicekit transcribe
      (Press Ctrl+C to stop recording)
 
   5. Read text aloud:
-     $ vtt speak "Hello world" -v Heart
+     $ voicekit speak "Hello world" -v Heart
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  COMMANDS OVERVIEW
@@ -2446,82 +2446,82 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Record from microphone:
-    $ vtt transcribe
+    $ voicekit transcribe
 
   Use specific model:
-    $ vtt transcribe --model whisper-tiny
-    $ vtt transcribe --model parakeet-1.1b
+    $ voicekit transcribe --model whisper-tiny
+    $ voicekit transcribe --model parakeet-1.1b
 
   Auto-stop on silence:
-    $ vtt transcribe --silence-timeout 15
+    $ voicekit transcribe --silence-timeout 15
     (Stops after 15 seconds of silence)
 
   Custom silence threshold:
-    $ vtt transcribe --silence-timeout 15 --silence-threshold 0.015
+    $ voicekit transcribe --silence-timeout 15 --silence-threshold 0.015
     (Default threshold is 0.02 amplitude)
 
   Set maximum duration:
-    $ vtt transcribe --max-duration 300
+    $ voicekit transcribe --max-duration 300
     (Stops after 5 minutes regardless)
 
   Transcribe existing audio file:
-    $ vtt transcribe --input recording.wav
+    $ voicekit transcribe --input recording.wav
 
   Output formats:
-    $ vtt transcribe --format json              # Full JSON (default)
-    $ vtt transcribe --format text              # Text with newline
-    $ vtt transcribe --format raw               # Raw text, no newline
-    $ vtt transcribe --quiet                    # Same as --format raw
+    $ voicekit transcribe --format json              # Full JSON (default)
+    $ voicekit transcribe --format text              # Text with newline
+    $ voicekit transcribe --format raw               # Raw text, no newline
+    $ voicekit transcribe --quiet                    # Same as --format raw
 
   Save to file:
-    $ vtt transcribe --output meeting.txt
-    $ vtt transcribe -o meeting.txt --format text
+    $ voicekit transcribe --output meeting.txt
+    $ voicekit transcribe -o meeting.txt --format text
 
   Background transcription (runs in background):
-    $ vtt transcribe start
-    $ vtt transcribe start --silence-timeout 15
-    $ vtt transcribe stop  # Stops recording and transcribes
+    $ voicekit transcribe start
+    $ voicekit transcribe start --silence-timeout 15
+    $ voicekit transcribe stop  # Stops recording and transcribes
 
   Check background status:
-    $ vtt transcribe status
+    $ voicekit transcribe status
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  SPEAK - Text to Speech
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Speak text directly:
-    $ vtt speak "Hello world"
+    $ voicekit speak "Hello world"
 
   Use specific voice and engine:
-    $ vtt speak -e kokoro -v Heart "Hello world"
-    $ vtt speak --engine piper --voice Amy "Hello world"
-    $ vtt speak -e system -v Samantha "Hello world"
+    $ voicekit speak -e kokoro -v Heart "Hello world"
+    $ voicekit speak --engine piper --voice Amy "Hello world"
+    $ voicekit speak -e system -v Samantha "Hello world"
 
   Control playback speed (0.5-2.0x):
-    $ vtt speak -e kokoro -v Heart --speed 1.5 "Fast speech"
-    $ vtt speak -e piper -v Amy --speed 0.8 "Slow and clear"
+    $ voicekit speak -e kokoro -v Heart --speed 1.5 "Fast speech"
+    $ voicekit speak -e piper -v Amy --speed 0.8 "Slow and clear"
 
   Read from file:
-    $ vtt speak -e kokoro -f document.txt
-    $ vtt speak --engine piper --file essay.txt -v Amy
+    $ voicekit speak -e kokoro -f document.txt
+    $ voicekit speak --engine piper --file essay.txt -v Amy
 
   Pipe from stdin (automatically detected):
-    $ echo "Hello world" | vtt speak -e kokoro
-    $ cat script.txt | vtt speak -e system -v Daniel
-    $ ls -la | vtt speak -e piper -v Alex
-    $ date | vtt speak -e system
+    $ echo "Hello world" | voicekit speak -e kokoro
+    $ cat script.txt | voicekit speak -e system -v Daniel
+    $ ls -la | voicekit speak -e piper -v Alex
+    $ date | voicekit speak -e system
 
   Save to file (don't play):
-    $ vtt speak -e kokoro "Hello" --output greeting.wav
-    $ vtt speak -e piper -f input.txt -o output.wav
+    $ voicekit speak -e kokoro "Hello" --output greeting.wav
+    $ voicekit speak -e piper -f input.txt -o output.wav
 
   Quiet mode:
-    $ vtt speak -e kokoro "Hello" --quiet
+    $ voicekit speak -e kokoro "Hello" --quiet
 
   With environment variables set (no --engine needed):
-    $ export VTT_DEFAULT_TTS_ENGINE=kokoro
-    $ export VTT_DEFAULT_TTS_VOICE=Heart
-    $ vtt speak "Hello world"
+    $ export VOICEKIT_DEFAULT_TTS_ENGINE=kokoro
+    $ export VOICEKIT_DEFAULT_TTS_VOICE=Heart
+    $ voicekit speak "Hello world"
 
   Features:
     • Auto-stops any existing playback before starting new audio
@@ -2533,14 +2533,14 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Stop current playback:
-    $ vtt playback stop
+    $ voicekit playback stop
 
   Check playback status:
-    $ vtt playback status
+    $ voicekit playback status
     (Outputs JSON: {"playing": true, "pid": 12345})
 
   Get current playback PID:
-    $ vtt playback pid
+    $ voicekit playback pid
     (Returns PID or empty string)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2548,22 +2548,22 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   List all voices:
-    $ vtt voices list
+    $ voicekit voices list
     (Shows download status for each voice)
 
   Download a voice:
-    $ vtt voices download Heart --engine kokoro
-    $ vtt voices download Amy --engine piper
-    $ vtt voices download Adam --engine kokoro
+    $ voicekit voices download Heart --engine kokoro
+    $ voicekit voices download Amy --engine piper
+    $ voicekit voices download Adam --engine kokoro
 
   Delete a voice:
-    $ vtt voices delete Heart --engine kokoro
+    $ voicekit voices delete Heart --engine kokoro
 
   Preview a voice:
-    $ vtt voices preview Heart --engine kokoro
-    $ vtt voices preview Amy --engine piper
-    $ vtt voices preview Samantha --engine system
-    $ vtt voices preview Heart --engine kokoro --speed 1.2
+    $ voicekit voices preview Heart --engine kokoro
+    $ voicekit voices preview Amy --engine piper
+    $ voicekit voices preview Samantha --engine system
+    $ voicekit voices preview Heart --engine kokoro --speed 1.2
 
   Available Voices:
     
@@ -2583,16 +2583,16 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   List all models:
-    $ vtt models list
+    $ voicekit models list
     (Shows download status for each model)
 
   Download a model:
-    $ vtt models download whisper-tiny
-    $ vtt models download whisper-small
-    $ vtt models download parakeet-110m
+    $ voicekit models download whisper-tiny
+    $ voicekit models download whisper-small
+    $ voicekit models download parakeet-110m
 
   Delete a model:
-    $ vtt models delete whisper-large
+    $ voicekit models delete whisper-large
 
   Available Models:
     
@@ -2614,27 +2614,27 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
   instant responses. Without it, each request has a ~5-10s cold start.
 
   Start server:
-    $ vtt server start
+    $ voicekit server start
 
   Start with custom idle timeout:
-    $ vtt server start --timeout 300
+    $ voicekit server start --timeout 300
     (Server stops after 5 minutes of inactivity)
 
   Check status:
-    $ vtt server status
+    $ voicekit server status
 
   Stop server:
-    $ vtt server stop
+    $ voicekit server stop
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  STORAGE - Storage Usage
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Show storage usage for dependencies, models, and voices:
-    $ vtt storage
+    $ voicekit storage
 
   Output as JSON:
-    $ vtt storage --json
+    $ voicekit storage --json
 
   Shows:
     • Dependency paths and sizes (Python, sox, afplay, say)
@@ -2648,10 +2648,10 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Check system health:
-    $ vtt doctor
+    $ voicekit doctor
 
   Output as JSON:
-    $ vtt doctor --json
+    $ voicekit doctor --json
 
   Checks:
     • Environment variables configured
@@ -2668,24 +2668,24 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Environment Variables:
-    VTT_PYTHON_PATH          Path to Python 3.10+ (default: /opt/homebrew/bin/python3)
-    VTT_KOKORO_PYTHON_PATH   Path to Python for Kokoro (default: ~/.local/lib-kokoro/venv/bin/python3)
-    VTT_SOX_PATH             Path to sox binary (default: /opt/homebrew/bin/sox)
-    VTT_DATA_DIR             Data directory (default: ~/.cache/VoiceToText)
-    VTT_KOKORO_SOCKET        Unix socket path (default: /tmp/kokoro_tts_<uid>.sock)
-    VTT_KOKORO_IDLE_TIMEOUT  Server idle timeout (default: 120)
-    VTT_DEFAULT_STT_MODEL    Default model (default: whisper-tiny)
-    VTT_DEFAULT_TTS_ENGINE   Default TTS engine (piper, kokoro, system)
-    VTT_DEFAULT_TTS_VOICE    Default voice (default: Samantha)
-    VTT_LOG_LEVEL            Log level: debug, info, warn, error (default: info)
-    VTT_ASK_PERMISSION       Prompt before installing engine dependencies (default: true)
+    VOICEKIT_PYTHON_PATH          Path to Python 3.10+ (default: /opt/homebrew/bin/python3)
+    VOICEKIT_KOKORO_PYTHON_PATH   Path to Python for Kokoro (default: ~/.local/lib-kokoro/venv/bin/python3)
+    VOICEKIT_SOX_PATH             Path to sox binary (default: /opt/homebrew/bin/sox)
+    VOICEKIT_DATA_DIR             Data directory (default: ~/.cache/VoiceToText)
+    VOICEKIT_KOKORO_SOCKET        Unix socket path (default: /tmp/kokoro_tts_<uid>.sock)
+    VOICEKIT_KOKORO_IDLE_TIMEOUT  Server idle timeout (default: 120)
+    VOICEKIT_DEFAULT_STT_MODEL    Default model (default: whisper-tiny)
+    VOICEKIT_DEFAULT_TTS_ENGINE   Default TTS engine (piper, kokoro, system)
+    VOICEKIT_DEFAULT_TTS_VOICE    Default voice (default: Samantha)
+    VOICEKIT_LOG_LEVEL            Log level: debug, info, warn, error (default: info)
+    VOICEKIT_ASK_PERMISSION       Prompt before installing engine dependencies (default: true)
                              Set to 'false' for headless/automated usage
 
   Set in your shell profile:
-    export VTT_PYTHON_PATH=/opt/homebrew/bin/python3
-    export VTT_DEFAULT_TTS_ENGINE=kokoro
-    export VTT_DEFAULT_TTS_VOICE=Heart
-    export VTT_ASK_PERMISSION=false  # Skip prompts for automated scripts
+    export VOICEKIT_PYTHON_PATH=/opt/homebrew/bin/python3
+    export VOICEKIT_DEFAULT_TTS_ENGINE=kokoro
+    export VOICEKIT_DEFAULT_TTS_VOICE=Heart
+    export VOICEKIT_ASK_PERMISSION=false  # Skip prompts for automated scripts
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  EXIT CODES
@@ -2703,14 +2703,14 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Record meeting with auto-stop:
-    $ vtt transcribe --silence-timeout 15 -o meeting.txt
+    $ voicekit transcribe --silence-timeout 15 -o meeting.txt
 
   Read document with speed boost:
-    $ vtt speak -f report.txt -e kokoro -v Heart --speed 1.3
+    $ voicekit speak -f report.txt -e kokoro -v Heart --speed 1.3
 
   Chain commands (transcribe and read back):
     $ TEXT=$(vtt transcribe --silence-timeout 10 --quiet)
-    $ echo "You said: $TEXT" | vtt speak -e system -v Samantha
+    $ echo "You said: $TEXT" | voicekit speak -e system -v Samantha
 
   Script automation:
     #!/bin/bash
@@ -2719,13 +2719,13 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
     echo "Transcribed: $TEXT"
 
   Stop all audio:
-    $ vtt playback stop
+    $ voicekit playback stop
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  TIPS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  • First run: Run 'vtt doctor' to check your setup
+  • First run: Run 'voicekit doctor' to check your setup
   • Silence detection: Use --silence-timeout for hands-free operation
   • Kokoro server: Start it for faster TTS responses
   • Speed control: 1.0 = normal, 0.5 = half, 2.0 = double
@@ -2734,12 +2734,12 @@ using Apple MLX. All processing happens on-device - no cloud APIs.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 For more help on a specific command:
-  $ vtt <command> --help
+  $ voicekit <command> --help
 
 Examples:
-  $ vtt transcribe --help
-  $ vtt speak --help
-  $ vtt voices --help
+  $ voicekit transcribe --help
+  $ voicekit speak --help
+  $ voicekit voices --help
 `);
     process.exit(0);
   });
@@ -2749,8 +2749,8 @@ program.on("--help", () => {
   console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 For comprehensive help with examples:
-  $ vtt help-all
-  $ vtt h
+  $ voicekit help-all
+  $ voicekit h
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `);
 });

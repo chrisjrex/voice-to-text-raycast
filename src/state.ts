@@ -4,7 +4,7 @@
  */
 
 import { LocalStorage } from "@raycast/api";
-import type { StateStorage } from "@vtt/core";
+import type { StateStorage } from "@voicekit/core";
 
 export const raycastStateStorage: StateStorage = {
   async getString(key: string): Promise<string | undefined> {

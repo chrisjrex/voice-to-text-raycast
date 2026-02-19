@@ -24,11 +24,11 @@ const DEFAULT_CONFIG: Config = {
   pythonPath: "/opt/homebrew/bin/python3",
   kokoroPythonPath: `${homedir()}/.local/lib-kokoro/venv/bin/python3`,
   soxPath: "/opt/homebrew/bin/sox",
-  dataDir: `${homedir()}/.cache/VoiceToText`,
-  kokoroSocket: `/tmp/kokoro_tts_${process.getuid?.() ?? 0}.sock`,
+  dataDir: `${homedir()}/.cache/VoiceKit`,
+  kokoroSocket: `/tmp/voicekit_tts_${process.getuid?.() ?? 0}.sock`,
   kokoroIdleTimeout: 120,
-  defaultSTTModel: "", // No default - model must be specified or set via VTT_DEFAULT_STT_MODEL
-  defaultTTSEngine: "", // No default - engine must be specified or set via VTT_DEFAULT_TTS_ENGINE
+  defaultSTTModel: "", // No default - model must be specified or set via VOICEKIT_DEFAULT_STT_MODEL
+  defaultTTSEngine: "", // No default - engine must be specified or set via VOICEKIT_DEFAULT_TTS_ENGINE
   defaultTTSVoice: "Samantha",
   logLevel: "info"
 };
@@ -107,12 +107,12 @@ export function getRuntimeInfo(): {
   soxPath: string;
 } {
   // Check if using environment override (custom)
-  if (process.env.VTT_PYTHON_PATH) {
+  if (process.env.VOICEKIT_PYTHON_PATH) {
     return {
       type: "custom",
-      pythonPath: resolveHomePath(process.env.VTT_PYTHON_PATH),
-      soxPath: process.env.VTT_SOX_PATH 
-        ? resolveHomePath(process.env.VTT_SOX_PATH)
+      pythonPath: resolveHomePath(process.env.VOICEKIT_PYTHON_PATH),
+      soxPath: process.env.VOICEKIT_SOX_PATH 
+        ? resolveHomePath(process.env.VOICEKIT_SOX_PATH)
         : DEFAULT_CONFIG.soxPath,
     };
   }
@@ -146,44 +146,44 @@ export function loadConfig(): Config {
   };
   
   // Override from environment variables (always take precedence)
-  if (process.env.VTT_PYTHON_PATH) {
-    config.pythonPath = resolveHomePath(process.env.VTT_PYTHON_PATH);
+  if (process.env.VOICEKIT_PYTHON_PATH) {
+    config.pythonPath = resolveHomePath(process.env.VOICEKIT_PYTHON_PATH);
   }
   
-  if (process.env.VTT_KOKORO_PYTHON_PATH) {
-    config.kokoroPythonPath = resolveHomePath(process.env.VTT_KOKORO_PYTHON_PATH);
+  if (process.env.VOICEKIT_KOKORO_PYTHON_PATH) {
+    config.kokoroPythonPath = resolveHomePath(process.env.VOICEKIT_KOKORO_PYTHON_PATH);
   }
   
-  if (process.env.VTT_SOX_PATH) {
-    config.soxPath = resolveHomePath(process.env.VTT_SOX_PATH);
+  if (process.env.VOICEKIT_SOX_PATH) {
+    config.soxPath = resolveHomePath(process.env.VOICEKIT_SOX_PATH);
   }
   
-  if (process.env.VTT_DATA_DIR) {
-    config.dataDir = resolveHomePath(process.env.VTT_DATA_DIR);
+  if (process.env.VOICEKIT_DATA_DIR) {
+    config.dataDir = resolveHomePath(process.env.VOICEKIT_DATA_DIR);
   }
   
-  if (process.env.VTT_KOKORO_SOCKET) {
-    config.kokoroSocket = resolveHomePath(process.env.VTT_KOKORO_SOCKET);
+  if (process.env.VOICEKIT_KOKORO_SOCKET) {
+    config.kokoroSocket = resolveHomePath(process.env.VOICEKIT_KOKORO_SOCKET);
   }
   
-  if (process.env.VTT_KOKORO_IDLE_TIMEOUT) {
-    config.kokoroIdleTimeout = parseIntOrDefault(process.env.VTT_KOKORO_IDLE_TIMEOUT, 120);
+  if (process.env.VOICEKIT_KOKORO_IDLE_TIMEOUT) {
+    config.kokoroIdleTimeout = parseIntOrDefault(process.env.VOICEKIT_KOKORO_IDLE_TIMEOUT, 120);
   }
   
-  if (process.env.VTT_DEFAULT_STT_MODEL) {
-    config.defaultSTTModel = process.env.VTT_DEFAULT_STT_MODEL;
+  if (process.env.VOICEKIT_DEFAULT_STT_MODEL) {
+    config.defaultSTTModel = process.env.VOICEKIT_DEFAULT_STT_MODEL;
   }
 
-  if (process.env.VTT_DEFAULT_TTS_ENGINE) {
-    config.defaultTTSEngine = process.env.VTT_DEFAULT_TTS_ENGINE;
+  if (process.env.VOICEKIT_DEFAULT_TTS_ENGINE) {
+    config.defaultTTSEngine = process.env.VOICEKIT_DEFAULT_TTS_ENGINE;
   }
 
-  if (process.env.VTT_DEFAULT_TTS_VOICE) {
-    config.defaultTTSVoice = process.env.VTT_DEFAULT_TTS_VOICE;
+  if (process.env.VOICEKIT_DEFAULT_TTS_VOICE) {
+    config.defaultTTSVoice = process.env.VOICEKIT_DEFAULT_TTS_VOICE;
   }
   
-  if (process.env.VTT_LOG_LEVEL) {
-    const level = process.env.VTT_LOG_LEVEL as Config["logLevel"];
+  if (process.env.VOICEKIT_LOG_LEVEL) {
+    const level = process.env.VOICEKIT_LOG_LEVEL as Config["logLevel"];
     if (["debug", "info", "warn", "error"].includes(level)) {
       config.logLevel = level;
     }

@@ -1,4 +1,4 @@
-import { getSTTEngine, getModelByAlias, type ModelInfo } from "@vtt/core";
+import { getSTTEngine, getModelByAlias, type ModelInfo } from "@voicekit/core";
 
 export function parseModel(pref: string): {
   provider: "whisper" | "parakeet";

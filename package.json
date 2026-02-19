@@ -1,8 +1,8 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "voice-to-text",
-  "title": "Voice-To-Text",
-  "description": "Voice-to-text and Text-to-Speech with local models",
+  "name": "voicekit",
+  "title": "VoiceKit",
+  "description": "Voice-to-text and text-to-speech with local models",
   "icon": "icon.png",
   "author": "rex",
   "categories": [
@@ -13,7 +13,7 @@
     {
       "name": "toggle-dictation",
       "title": "Transcribe",
-      "description": "Start/stop local voice-to-text recording",
+      "description": "Start/stop local voice transcription recording",
       "mode": "no-view",
       "preferences": [
         {
@@ -56,7 +56,7 @@
     {
       "name": "manage-models",
       "title": "Manage Models",
-      "description": "View and download voice-to-text models",
+      "description": "View and download speech models",
       "mode": "view",
       "preferences": [
         {
@@ -171,7 +171,7 @@
   "dependencies": {
     "@raycast/api": "^1.93.3",
     "@raycast/utils": "^1.17.0",
-    "@vtt/core": "file:packages/core"
+    "@voicekit/core": "file:packages/core"
   },
   "devDependencies": {
     "@raycast/eslint-config": "^1.0.11",

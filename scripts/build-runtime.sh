@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build script for VTT bundled Python runtime using python-build-standalone
+# Build script for VoiceKit bundled Python runtime using python-build-standalone
 # Creates a relocatable Python 3.11 environment with all dependencies
 
 set -e
@@ -44,7 +44,7 @@ else
     PBS_ARCH="x86_64"
 fi
 
-log "Building VTT runtime for macOS $ARCH"
+log "Building VoiceKit runtime for macOS $ARCH"
 log "Python version: $PYTHON_VERSION"
 
 # Clean previous build
@@ -125,7 +125,7 @@ rm -f "$RUNTIME_DIR/lib/libpython*.a"
 
 # Create tarball
 log "Creating distribution tarball..."
-ARCHIVE_NAME="vtt-runtime-${PYTHON_VERSION}-macos-${ARCH}.tar.gz"
+ARCHIVE_NAME="voicekit-runtime-${PYTHON_VERSION}-macos-${ARCH}.tar.gz"
 cd "$RUNTIME_DIR"
 tar czf "$PROJECT_ROOT/$ARCHIVE_NAME" .
 
@@ -144,6 +144,14 @@ if [ -d "$PROJECT_ROOT/packages/cli/assets" ]; then
     rm -rf "$PROJECT_ROOT/packages/cli/assets/runtime"
     cp -R "$RUNTIME_DIR" "$PROJECT_ROOT/packages/cli/assets/runtime"
     log "Runtime copied to packages/cli/assets/runtime"
+fi
+
+# Also copy to voicekit directory if it exists
+if [ -d "$PROJECT_ROOT/packages/cli/assets/voicekit" ]; then
+    log "Copying runtime to voicekit assets..."
+    rm -rf "$PROJECT_ROOT/packages/cli/assets/voicekit/runtime"
+    cp -R "$RUNTIME_DIR" "$PROJECT_ROOT/packages/cli/assets/voicekit/runtime"
+    log "Runtime copied to packages/cli/assets/voicekit/runtime"
 fi
 
 # Cleanup

@@ -1,4 +1,4 @@
-# Voice-to-Text
+# VoiceKit
 
 Local voice-to-text and text-to-speech for Raycast. Everything runs on-device — no cloud APIs, no data leaves your machine.
 
@@ -19,7 +19,7 @@ This installs everything including Python 3.11 and all dependencies to `~/.local
 ### Option 2: NPM (if you have Python already)
 
 ```bash
-npm install -g @vtt/cli
+npm install -g @voicekit/cli
 ```
 
 **Prerequisites:** Python 3.10+ and sox (`brew install python sox`)
@@ -27,8 +27,8 @@ npm install -g @vtt/cli
 ### Option 3: Homebrew
 
 ```bash
-brew tap chrisjrex/vtt
-brew install vtt
+brew tap chrisjrex/voicekit
+brew install voicekit
 ```
 
 ### Option 4: Lite Install (Advanced)
@@ -40,8 +40,8 @@ If you prefer managing dependencies yourself:
 brew install sox python@3.11
 pip3 install mlx-whisper parakeet-mlx piper-tts kokoro
 
-# Install VTT
-npm install -g @vtt/cli-lite
+# Install VoiceKit
+npm install -g @voicekit/cli-lite
 ```
 
 See [packages/cli/README.md](packages/cli/README.md) for detailed installation options.
@@ -52,19 +52,19 @@ See [packages/cli/README.md](packages/cli/README.md) for detailed installation o
 
 1. **Check installation:**
    ```bash
-   vtt doctor
+   voicekit doctor
    ```
 
 2. **Download a model and voice:**
    ```bash
-   vtt models download whisper-tiny
-   vtt voices download Heart
+   voicekit models download whisper-tiny
+   voicekit voices download Heart
    ```
 
 3. **Start using:**
    ```bash
-   vtt transcribe    # Record and transcribe
-   vtt speak "Hello" # Text to speech
+   voicekit transcribe    # Record and transcribe
+   voicekit speak "Hello" # Text to speech
    ```
 
 ---
@@ -75,7 +75,7 @@ See [packages/cli/README.md](packages/cli/README.md) for detailed installation o
 
 Start/stop recording. Transcribes on stop, then copies and/or pastes the result.
 
-**Settings** (Raycast Settings > Extensions > Voice-to-Text > Transcribe):
+**Settings** (Raycast Settings > Extensions > VoiceKit > Transcribe):
 
 | Setting | Default | Description |
 |---|---|---|
@@ -94,7 +94,7 @@ If the Kokoro server is running (via TTS Status), Read Aloud uses it for instant
 
 Browse, download, and select STT models and TTS voices.
 
-**Settings** (Raycast Settings > Extensions > Voice-to-Text > Manage Models):
+**Settings** (Raycast Settings > Extensions > VoiceKit > Manage Models):
 
 | Setting | Default | Description |
 |---|---|---|
@@ -117,7 +117,7 @@ Browse and manage past transcriptions.
 
 Shows a menu bar icon with TTS engine status. Controls for starting/stopping the Kokoro server and installing/uninstalling TTS engines.
 
-**Settings** (Raycast Settings > Extensions > Voice-to-Text > TTS Status):
+**Settings** (Raycast Settings > Extensions > VoiceKit > TTS Status):
 
 | Setting | Default | Description |
 |---|---|---|
@@ -175,7 +175,7 @@ Voices are downloaded individually (~60MB each). The first download also install
 
 ## Extension Settings
 
-These apply across all commands (Raycast Settings > Extensions > Voice-to-Text):
+These apply across all commands (Raycast Settings > Extensions > VoiceKit):
 
 ### Core Settings
 
@@ -185,9 +185,9 @@ These apply across all commands (Raycast Settings > Extensions > Voice-to-Text):
 
 ### Runtime Settings (Optional)
 
-**When using `@vtt/cli` (bundled):** These settings are automatically configured. You only need to change them if you want to use a custom Python environment.
+**When using `@voicekit/cli` (bundled):** These settings are automatically configured. You only need to change them if you want to use a custom Python environment.
 
-**When using `@vtt/cli-lite`:** These settings must point to your system Python installation.
+**When using `@voicekit/cli-lite`:** These settings must point to your system Python installation.
 
 | Setting | Default | Description |
 |---|---|---|
@@ -196,11 +196,11 @@ These apply across all commands (Raycast Settings > Extensions > Voice-to-Text):
 | Sox Path | Auto-detected | Path to sox binary for audio recording |
 
 **Environment Variables:** You can also set these via environment variables (takes precedence over settings):
-- `VTT_PYTHON_PATH`
-- `VTT_KOKORO_PYTHON_PATH`
-- `VTT_SOX_PATH`
-- `VTT_DATA_DIR`
-- `VTT_HF_TOKEN` - HuggingFace token for higher rate limits (also respects `HF_TOKEN`)
+- `VOICEKIT_PYTHON_PATH`
+- `VOICEKIT_KOKORO_PYTHON_PATH`
+- `VOICEKIT_SOX_PATH`
+- `VOICEKIT_DATA_DIR`
+- `VOICEKIT_HF_TOKEN` - HuggingFace token for higher rate limits (also respects `HF_TOKEN`)
 
 ---
 

@@ -1,21 +1,19 @@
 {
-  "name": "@vtt/core",
+  "name": "@voicekit/core",
   "version": "1.0.0",
-  "description": "Core voice-to-text and text-to-speech library",
+  "description": "Core VoiceKit speech recognition and synthesis library",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "lint": "eslint src/**/*.ts",
-    "test": "vitest run"
+    "lint": "eslint src/**/*.ts"
   },
   "keywords": ["voice", "speech", "tts", "stt", "local", "mlx"],
   "author": "rex",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.13.4",
-    "typescript": "^5.7.3",
-    "vitest": "^4.0.18"
+    "typescript": "^5.7.3"
   }
 }

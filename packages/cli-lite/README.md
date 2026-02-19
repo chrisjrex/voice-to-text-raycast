@@ -1,12 +1,12 @@
-# VTT CLI Lite
+# VoiceKit CLI Lite
 
-Lightweight version of the Voice-to-Text CLI tool. This version requires manual installation of system dependencies.
+Lightweight version of the VoiceKit CLI tool. This version requires manual installation of system dependencies.
 
-> **Want zero setup?** Use [`@vtt/cli`](https://www.npmjs.com/package/@vtt/cli) instead - it includes everything bundled.
+> **Want zero setup?** Use [`@voicekit/cli`](https://www.npmjs.com/package/@voicekit/cli) instead - it includes everything bundled.
 
 ## Prerequisites
 
-Before installing vtt-lite, ensure you have:
+Before installing voicekit-lite, ensure you have:
 
 ### 1. System Requirements
 - **macOS** with Apple Silicon (M1 or later)
@@ -58,8 +58,8 @@ Kokoro requires Python 3.10-3.12 due to spacy/blis dependencies. If your system 
 python3.11 -m venv ~/.local/lib-kokoro/venv
 ~/.local/lib-kokoro/venv/bin/pip install kokoro soundfile numpy
 
-# Configure VTT to use it
-export VTT_KOKORO_PYTHON_PATH="$HOME/.local/lib-kokoro/venv/bin/python3"
+# Configure VoiceKit to use it
+export VOICEKIT_KOKORO_PYTHON_PATH="$HOME/.local/lib-kokoro/venv/bin/python3"
 ```
 
 Add to your `~/.zshrc` or `~/.bash_profile` to make it permanent.
@@ -67,7 +67,7 @@ Add to your `~/.zshrc` or `~/.bash_profile` to make it permanent.
 ### 5. Verify Installation
 
 ```bash
-vtt doctor
+voicekit doctor
 ```
 
 This checks all dependencies and shows what's installed.
@@ -79,14 +79,14 @@ This checks all dependencies and shows what's installed.
 Once prerequisites are met:
 
 ```bash
-npm install -g @vtt/cli-lite
+npm install -g @voicekit/cli-lite
 ```
 
 Or via Homebrew:
 
 ```bash
-brew tap chrisjrex/vtt
-brew install vtt-lite
+brew tap chrisjrex/voicekit
+brew install voicekit-lite
 ```
 
 ---
@@ -99,47 +99,47 @@ Override default paths if needed:
 
 ```bash
 # Main Python for STT and Piper TTS
-export VTT_PYTHON_PATH=/opt/homebrew/bin/python3
+export VOICEKIT_PYTHON_PATH=/opt/homebrew/bin/python3
 
 # Separate Python for Kokoro (if using venv)
-export VTT_KOKORO_PYTHON_PATH="$HOME/.local/lib-kokoro/venv/bin/python3"
+export VOICEKIT_KOKORO_PYTHON_PATH="$HOME/.local/lib-kokoro/venv/bin/python3"
 
 # Sox binary path
-export VTT_SOX_PATH=/opt/homebrew/bin/sox
+export VOICEKIT_SOX_PATH=/opt/homebrew/bin/sox
 
 # Data directory for models and voices
-export VTT_DATA_DIR="$HOME/.local/share/vtt"
+export VOICEKIT_DATA_DIR="$HOME/.local/share/voicekit"
 
 # Default STT model
-export VTT_DEFAULT_STT_MODEL=whisper-tiny
+export VOICEKIT_DEFAULT_STT_MODEL=whisper-tiny
 
 # Default TTS voice
-export VTT_DEFAULT_TTS_VOICE=Samantha
+export VOICEKIT_DEFAULT_TTS_VOICE=Samantha
 
 # HuggingFace token for higher rate limits (also respects HF_TOKEN)
-export VTT_HF_TOKEN="your_hf_token"
+export VOICEKIT_HF_TOKEN="your_hf_token"
 ```
 
 ### Using Python Version Managers
 
-VTT-lite works with any Python version manager. Set `VTT_PYTHON_PATH` to your managed environment:
+VoiceKit-lite works with any Python version manager. Set `VOICEKIT_PYTHON_PATH` to your managed environment:
 
 **With `uv`:**
 ```bash
 uv python install 3.11
-uv venv ~/.local/share/vtt/venv --python 3.11
-source ~/.local/share/vtt/venv/bin/activate
+uv venv ~/.local/share/voicekit/venv --python 3.11
+source ~/.local/share/voicekit/venv/bin/activate
 pip install mlx-whisper parakeet-mlx piper-tts kokoro
-export VTT_PYTHON_PATH="$HOME/.local/share/vtt/venv/bin/python"
+export VOICEKIT_PYTHON_PATH="$HOME/.local/share/voicekit/venv/bin/python"
 ```
 
 **With `pyenv`:**
 ```bash
 pyenv install 3.11.9
-pyenv virtualenv 3.11.9 vtt
-pyenv activate vtt
+pyenv virtualenv 3.11.9 voicekit
+pyenv activate voicekit
 pip install mlx-whisper parakeet-mlx piper-tts kokoro
-export VTT_PYTHON_PATH="$HOME/.pyenv/versions/vtt/bin/python"
+export VOICEKIT_PYTHON_PATH="$HOME/.pyenv/versions/voicekit/bin/python"
 ```
 
 ---
@@ -148,20 +148,20 @@ export VTT_PYTHON_PATH="$HOME/.pyenv/versions/vtt/bin/python"
 
 ```bash
 # List available models and voices
-vtt models list
-vtt voices list
+voicekit models list
+voicekit voices list
 
 # Download a model
-vtt models download whisper-tiny
+voicekit models download whisper-tiny
 
 # Download a voice
-vtt voices download Heart
+voicekit voices download Heart
 
 # Start transcribing
-vtt transcribe
+voicekit transcribe
 
 # Read text aloud
-vtt speak "Hello world" -v Heart
+voicekit speak "Hello world" -v Heart
 ```
 
 ---
@@ -171,38 +171,38 @@ vtt speak "Hello world" -v Heart
 See the [full CLI documentation](https://github.com/chrisjrex/voice-to-text-raycast/blob/main/packages/cli/README.md) for all commands and options.
 
 Common commands:
-- `vtt transcribe` - Record and transcribe speech
-- `vtt speak [text]` - Text-to-speech
-- `vtt models list/download/delete` - Manage STT models
-- `vtt voices list/download/delete` - Manage TTS voices
-- `vtt doctor` - Check system health
-- `vtt help-all` - Show comprehensive help
+- `voicekit transcribe` - Record and transcribe speech
+- `voicekit speak [text]` - Text-to-speech
+- `voicekit models list/download/delete` - Manage STT models
+- `voicekit voices list/download/delete` - Manage TTS voices
+- `voicekit doctor` - Check system health
+- `voicekit help-all` - Show comprehensive help
 
 ---
 
 ## Troubleshooting
 
-**Issue:** `vtt doctor` shows missing dependencies
+**Issue:** `voicekit doctor` shows missing dependencies
 - **Solution:** Install prerequisites listed above
 
 **Issue:** Daemon not visible in Activity Monitor
 - **Solution:** Install setproctitle: `pip3 install setproctitle`
 
 **Issue:** Kokoro voice download fails
-- **Solution:** Ensure `VTT_KOKORO_PYTHON_PATH` points to Python 3.10-3.12
+- **Solution:** Ensure `VOICEKIT_KOKORO_PYTHON_PATH` points to Python 3.10-3.12
 
 **Issue:** Permission denied errors
-- **Solution:** Ensure data directory is writable: `mkdir -p ~/.local/share/vtt`
+- **Solution:** Ensure data directory is writable: `mkdir -p ~/.local/share/voicekit`
 
 **Issue:** Want to switch from lite to bundled version
-- **Solution:** `npm uninstall -g @vtt/cli-lite && npm install -g @vtt/cli`
+- **Solution:** `npm uninstall -g @voicekit/cli-lite && npm install -g @voicekit/cli`
 
 ---
 
-## Differences from @vtt/cli
+## Differences from @voicekit/cli
 
-| Feature | @vtt/cli-lite | @vtt/cli |
-|---------|---------------|----------|
+| Feature | @voicekit/cli-lite | @voicekit/cli |
+|---------|-------------------|---------------|
 | **Size** | ~500KB | ~50MB |
 | **Setup** | Manual dependencies | Zero setup |
 | **Python version** | Your choice | Bundled 3.11 |
@@ -213,15 +213,15 @@ Common commands:
 ## Uninstalling
 
 ```bash
-npm uninstall -g @vtt/cli-lite
+npm uninstall -g @voicekit/cli-lite
 
 # Optional: Remove data directory
-rm -rf ~/.local/share/vtt/
+rm -rf ~/.local/share/voicekit/
 ```
 
 For Homebrew:
 ```bash
-brew uninstall vtt-lite
+brew uninstall voicekit-lite
 ```
 
 ---

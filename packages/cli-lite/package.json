@@ -1,10 +1,10 @@
 {
-  "name": "@vtt/cli-lite",
+  "name": "@voicekit/cli-lite",
   "version": "1.0.0",
-  "description": "Voice-to-Text CLI tool (lite version - requires system dependencies)",
+  "description": "VoiceKit CLI tool (lite version - requires system dependencies)",
   "main": "dist/index.js",
   "bin": {
-    "vtt": "./dist/index.js"
+    "voicekit": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -24,7 +24,7 @@
   "author": "rex",
   "license": "MIT",
   "dependencies": {
-    "@vtt/core": "^1.0.0",
+    "@voicekit/core": "^1.0.0",
     "commander": "^12.0.0",
     "terminal-table": "^0.0.12"
   },

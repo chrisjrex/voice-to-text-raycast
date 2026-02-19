@@ -1,10 +1,10 @@
 {
-  "name": "@vtt/cli",
+  "name": "@voicekit/cli",
   "version": "1.0.0",
-  "description": "Voice-to-Text CLI tool - Local speech recognition and synthesis",
+  "description": "VoiceKit CLI tool - Local speech recognition and synthesis",
   "main": "dist/index.js",
   "bin": {
-    "vtt": "./dist/index.js"
+    "voicekit": "./dist/index.js"
   },
   "files": [
     "dist",
@@ -29,7 +29,7 @@
   "author": "rex",
   "license": "MIT",
   "dependencies": {
-    "@vtt/core": "^1.0.0",
+    "@voicekit/core": "^1.0.0",
     "commander": "^12.0.0"
   },
   "devDependencies": {

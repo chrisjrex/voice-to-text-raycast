@@ -1,5 +1,5 @@
 {
-  "name": "vtt-packages",
+  "name": "voicekit-packages",
   "private": true,
   "workspaces": [
     "core",
@@ -7,10 +7,9 @@
     "cli-lite"
   ],
   "scripts": {
-    "build": "npm run build --workspace=@vtt/core && npm run build --workspace=@vtt/cli",
-    "build:core": "npm run build --workspace=@vtt/core",
-    "build:cli": "npm run build --workspace=@vtt/cli",
-    "build:cli-lite": "npm run build --workspace=@vtt/cli-lite",
-    "test": "npm test --workspace=@vtt/core"
+    "build": "npm run build --workspace=@voicekit/core && npm run build --workspace=@voicekit/cli",
+    "build:core": "npm run build --workspace=@voicekit/core",
+    "build:cli": "npm run build --workspace=@voicekit/cli",
+    "build:cli-lite": "npm run build --workspace=@voicekit/cli-lite"
   }
 }

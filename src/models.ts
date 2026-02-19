@@ -1,5 +1,5 @@
 /**
- * Raycast models wrapper - re-exports from @vtt/core
+ * Raycast models wrapper - re-exports from @voicekit/core
  * This file provides Raycast-specific utilities while delegating to the core library
  */
 
@@ -33,7 +33,7 @@ import {
   setStateStorage,
   type VoiceInfo,
   type ModelInfo,
-} from "@vtt/core";
+} from "@voicekit/core";
 import { raycastStateStorage } from "./state";
 
 setStateStorage(raycastStateStorage);
