@@ -194,17 +194,9 @@ async function stopAndTranscribe(
   await updateCommandMetadata({ subtitle: "Transcribing..." });
   await showHUD("Transcribing...");
 
-  const scriptPath = join(environment.supportPath, "transcribe.py");
-
   try {
     const transcribeStart = Date.now();
-    const text = await transcribe(
-      pythonPath,
-      provider,
-      modelId,
-      audioPath,
-      scriptPath,
-    );
+    const text = await transcribe(pythonPath, provider, modelId, audioPath);
     const transcriptionMs = Date.now() - transcribeStart;
 
     if (!text) {

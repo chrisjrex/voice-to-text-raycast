@@ -9,12 +9,14 @@ import {
 import { spawn } from "child_process";
 import {
   existsSync,
+  mkdirSync,
   openSync,
   readFileSync,
   unlinkSync,
   writeFileSync,
 } from "fs";
 import { createConnection } from "net";
+import { homedir } from "os";
 import { join } from "path";
 import {
   getActiveTtsVoice,
@@ -49,6 +51,93 @@ const KOKORO_LOG = join(
   "daemon",
   "kokoro_server.log",
 );
+
+function buildKokoroServerScript(idleTimeout: number): string {
+  return `
+import os, sys, json, signal, time, socket
+import numpy as np, soundfile as sf
+from kokoro import KPipeline
+
+try:
+    import setproctitle
+    setproctitle.setproctitle("voiceToText-KokoroServer")
+except ImportError:
+    pass
+
+SOCKET_PATH = ${JSON.stringify(KOKORO_SOCK)}
+PID_PATH = ${JSON.stringify(KOKORO_PID)}
+IDLE_TIMEOUT = ${idleTimeout}
+
+with open(PID_PATH, "w") as f:
+    f.write(str(os.getpid()))
+
+pipelines = {}
+
+def cleanup(signum, frame):
+    try:
+        os.unlink(SOCKET_PATH)
+    except:
+        pass
+    try:
+        os.unlink(PID_PATH)
+    except:
+        pass
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, cleanup)
+signal.signal(signal.SIGINT, cleanup)
+
+server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+try:
+    os.unlink(SOCKET_PATH)
+except:
+    pass
+server.bind(SOCKET_PATH)
+server.listen(1)
+print("Server listening", flush=True)
+
+last_activity = time.time()
+
+while True:
+    server.settimeout(1.0)
+    try:
+        conn, _ = server.accept()
+        last_activity = time.time()
+    except socket.timeout:
+        if IDLE_TIMEOUT > 0 and time.time() - last_activity > IDLE_TIMEOUT:
+            cleanup(None, None)
+        continue
+    
+    data = b""
+    while b"\\n" not in data:
+        chunk = conn.recv(4096)
+        if not chunk:
+            break
+        data += chunk
+    
+    if not data:
+        conn.close()
+        continue
+    
+    try:
+        req = json.loads(data.decode().strip())
+        text = req.get("text", "")
+        voice = req.get("voice", "af_heart")
+        output = req.get("output", "")
+        
+        lang_code = voice[0] if voice else "a"
+        if lang_code not in pipelines:
+            pipelines[lang_code] = KPipeline(lang_code=lang_code)
+        
+        chunks = [audio for _, _, audio in pipelines[lang_code](text, voice=voice)]
+        sf.write(output, np.concatenate(chunks), 24000)
+        conn.send(b"ok\\n")
+    except Exception as e:
+        conn.send(f"{e}\\n".encode())
+    
+    conn.close()
+`.trim();
+}
 
 function isKokoroServerRunning(): Promise<boolean> {
   if (!existsSync(KOKORO_SOCK)) return Promise.resolve(false);
@@ -162,7 +251,6 @@ export {
   isKokoroServerRunning,
   startKokoroServer,
   stopKokoroServer,
-  resolveKokoroPython,
   buildKokoroServerScript,
 };
 export type { Preferences as ReadAloudPreferences };
@@ -195,6 +283,14 @@ export function stopCurrentPlayback(): void {
   } catch {
     /* ignore */
   }
+}
+
+function ensureTtsDir(): string {
+  const dir = join(environment.supportPath, "tts", "recordings");
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  return dir;
 }
 
 function startPlayback(outputPath: string): void {
@@ -313,6 +409,14 @@ function speakWithSay(text: string, voice: string): void {
     }
   });
   child.unref();
+}
+
+function resolveKokoroPython(prefs: Preferences): string {
+  let path = prefs.kokoroPythonPath;
+  if (path.startsWith("~/")) {
+    path = join(homedir(), path.slice(2));
+  }
+  return path;
 }
 
 export async function speakText(text: string): Promise<void> {

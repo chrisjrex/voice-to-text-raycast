@@ -7,6 +7,7 @@
 export {
   VOICE_ALIASES,
   MODEL_ALIASES,
+  VOICES_BY_ENGINE,
   getVoiceByAlias,
   getVoiceByAliasAndEngine,
   getModelByAlias,
@@ -59,6 +60,28 @@ export {
   type STTEngine
 } from "./stt";
 
+// State
+export {
+  StateStorage,
+  StateKeys,
+  setStateStorage,
+  getStateStorage,
+  hasStateStorage,
+  getActiveModel,
+  setActiveModel,
+  getActiveTtsVoice,
+  setActiveTtsVoice,
+  getActiveKokoroVoice,
+  setActiveKokoroVoice,
+  getActiveSystemVoice,
+  setActiveSystemVoice,
+  clearActiveSystemVoice,
+  clearActiveKokoroVoice,
+  clearActiveTtsVoice,
+  isTtsInitialized,
+  setTtsInitialized,
+} from "./state";
+
 // Errors
 export { ExitCodes, type ExitCode } from "./errors";
 
@@ -73,3 +96,14 @@ export {
   isLaunchAgentInstalled,
   type LaunchAgentConfig
 } from "./launchagent";
+
+// Model/Voice utilities
+export {
+  modelCacheDir,
+  isModelDownloaded,
+  isKokoroModelDownloaded,
+  kokoroSnapshotDir,
+  isKokoroVoiceDownloaded,
+  isPiperVoiceDownloaded,
+  KOKORO_MODEL_ID,
+} from "./utils";

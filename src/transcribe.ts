@@ -1,42 +1,19 @@
-import { execFile } from "child_process";
-import { unlinkSync, writeFileSync } from "fs";
-import { promisify } from "util";
-
-const execFileAsync = promisify(execFile);
+import { getSTTEngine, getModelByAlias, type ModelInfo } from "@vtt/core";
 
 export function parseModel(pref: string): {
   provider: "whisper" | "parakeet";
   modelId: string;
+  modelInfo: ModelInfo | undefined;
 } {
   const idx = pref.indexOf(":");
   const provider = pref.slice(0, idx) as "whisper" | "parakeet";
   const modelId = pref.slice(idx + 1);
-  return { provider, modelId };
-}
 
-export function buildTranscribeScript(
-  provider: string,
-  modelId: string,
-  audioPath: string,
-): string {
-  const escapedPath = audioPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  if (provider === "whisper") {
-    return (
-      [
-        "import mlx_whisper",
-        `r = mlx_whisper.transcribe("${escapedPath}", path_or_hf_repo="${modelId}")`,
-        `print(r["text"], end="")`,
-      ].join("\n") + "\n"
-    );
-  }
-  return (
-    [
-      "from parakeet_mlx import from_pretrained",
-      `model = from_pretrained("${modelId}")`,
-      `r = model.transcribe("${escapedPath}")`,
-      `print(r.text, end="")`,
-    ].join("\n") + "\n"
+  const modelInfo = getModelByAlias(
+    `${provider === "whisper" ? "whisper" : "parakeet"}-${modelId.split("/")[1]?.split("-")[0] || "tiny"}`,
   );
+
+  return { provider, modelId, modelInfo };
 }
 
 export async function transcribe(
@@ -44,27 +21,29 @@ export async function transcribe(
   provider: string,
   modelId: string,
   audioPath: string,
-  scriptPath: string,
 ): Promise<string> {
-  writeFileSync(
-    scriptPath,
-    buildTranscribeScript(provider, modelId, audioPath),
-  );
-  try {
-    const env = {
-      ...process.env,
-      PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}`,
-    };
-    const { stdout } = await execFileAsync(pythonPath, [scriptPath], {
-      timeout: 120_000,
-      env,
-    });
-    return stdout.trim();
-  } finally {
-    try {
-      unlinkSync(scriptPath);
-    } catch {
-      /* ignore */
-    }
+  const modelAlias = modelId.includes("whisper")
+    ? `whisper-${modelId.split("-").pop() || "tiny"}`
+    : `parakeet-${modelId.split("-").pop() || "110m"}`;
+
+  const model = getModelByAlias(modelAlias);
+  if (!model) {
+    throw new Error(`Unknown model: ${modelId}`);
   }
+
+  const engine = getSTTEngine(model);
+  const config = {
+    pythonPath,
+    kokoroPythonPath: pythonPath,
+    soxPath: "/opt/homebrew/bin/sox",
+    dataDir: "",
+    kokoroSocket: "",
+    kokoroIdleTimeout: 120,
+    defaultSTTModel: "",
+    defaultTTSEngine: "",
+    defaultTTSVoice: "",
+    logLevel: "info" as const,
+  };
+
+  return engine.transcribe(audioPath, model, config);
 }
