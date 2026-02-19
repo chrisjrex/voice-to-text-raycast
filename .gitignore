@@ -4,3 +4,5 @@ dist/
 *.tgz
 build/
 .DS_Store
+bin/
+vtt-runtime-*.tar.gz

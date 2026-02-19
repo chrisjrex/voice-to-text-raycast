@@ -5,8 +5,7 @@
  */
 
 import { Command } from "commander";
-import { readFileSync, existsSync, statSync, unlinkSync, readdirSync, rmdirSync, mkdirSync, copyFileSync, writeFileSync } from "fs";
-import { execSync, spawn } from "child_process";
+import { readFileSync, existsSync, statSync, unlinkSync, readdirSync, rmdirSync, mkdirSync } from "fs";
 import {
   loadConfig,
   log,
@@ -37,67 +36,6 @@ import {
   ExitCodes
 } from "@vtt/core";
 import { join, dirname } from "path";
-
-// Runtime extraction for standalone binary
-const RUNTIME_DIR = join(process.env.HOME || "", ".local", "share", "vtt", "runtime");
-const RUNTIME_TARBALL = join(__dirname, "runtime.tar.gz");
-
-function extractRuntime(): boolean {
-  // Check if already extracted
-  if (existsSync(join(RUNTIME_DIR, "bin", "python3"))) {
-    return true;
-  }
-  
-  // Check if we're in a pkg binary (assets are at /snapshot)
-  const isPkgBinary = __dirname.includes("/snapshot/");
-  
-  if (isPkgBinary) {
-    // In pkg binary, we need to copy the asset to a temp location first
-    try {
-      const assetPath = join(__dirname, "runtime.tar.gz");
-      const tempTarball = join(process.env.TMPDIR || "/tmp", "vtt-runtime.tar.gz");
-      
-      // Read the embedded asset and write to temp file
-      const assetContent = readFileSync(assetPath);
-      writeFileSync(tempTarball, assetContent);
-      
-      console.log("Extracting bundled runtime (one-time setup)...");
-      mkdirSync(RUNTIME_DIR, { recursive: true });
-      execSync(`tar xzf "${tempTarball}" -C "${RUNTIME_DIR}"`, { 
-        stdio: "inherit",
-        timeout: 120000 
-      });
-      
-      // Clean up temp file
-      unlinkSync(tempTarball);
-      console.log("Runtime extracted successfully!");
-      return true;
-    } catch (error) {
-      console.error("Failed to extract runtime:", error);
-      return false;
-    }
-  } else if (existsSync(RUNTIME_TARBALL)) {
-    // Regular file system access
-    console.log("Extracting bundled runtime (one-time setup)...");
-    try {
-      mkdirSync(RUNTIME_DIR, { recursive: true });
-      execSync(`tar xzf "${RUNTIME_TARBALL}" -C "${RUNTIME_DIR}"`, { 
-        stdio: "inherit",
-        timeout: 120000 
-      });
-      console.log("Runtime extracted successfully!");
-      return true;
-    } catch (error) {
-      console.error("Failed to extract runtime:", error);
-      return false;
-    }
-  }
-  
-  return false;
-}
-
-// Extract runtime on startup if needed
-extractRuntime();
 
 let spinnerInterval: NodeJS.Timeout | null = null;
 const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
