@@ -91,59 +91,6 @@ brew install voicekit-lite
 
 ---
 
-## Configuration
-
-### Environment Variables
-
-Override default paths if needed:
-
-```bash
-# Main Python for STT and Piper TTS
-export VOICEKIT_PYTHON_PATH=/opt/homebrew/bin/python3
-
-# Separate Python for Kokoro (if using venv)
-export VOICEKIT_KOKORO_PYTHON_PATH="$HOME/.local/lib-kokoro/venv/bin/python3"
-
-# Sox binary path
-export VOICEKIT_SOX_PATH=/opt/homebrew/bin/sox
-
-# Data directory for models and voices
-export VOICEKIT_DATA_DIR="$HOME/.local/share/voicekit"
-
-# Default STT model
-export VOICEKIT_DEFAULT_STT_MODEL=whisper-tiny
-
-# Default TTS voice
-export VOICEKIT_DEFAULT_TTS_VOICE=Samantha
-
-# HuggingFace token for higher rate limits (also respects HF_TOKEN)
-export VOICEKIT_HF_TOKEN="your_hf_token"
-```
-
-### Using Python Version Managers
-
-VoiceKit-lite works with any Python version manager. Set `VOICEKIT_PYTHON_PATH` to your managed environment:
-
-**With `uv`:**
-```bash
-uv python install 3.11
-uv venv ~/.local/share/voicekit/venv --python 3.11
-source ~/.local/share/voicekit/venv/bin/activate
-pip install mlx-whisper parakeet-mlx piper-tts kokoro
-export VOICEKIT_PYTHON_PATH="$HOME/.local/share/voicekit/venv/bin/python"
-```
-
-**With `pyenv`:**
-```bash
-pyenv install 3.11.9
-pyenv virtualenv 3.11.9 voicekit
-pyenv activate voicekit
-pip install mlx-whisper parakeet-mlx piper-tts kokoro
-export VOICEKIT_PYTHON_PATH="$HOME/.pyenv/versions/voicekit/bin/python"
-```
-
----
-
 ## Quick Start
 
 ```bash
@@ -166,36 +113,31 @@ voicekit speak "Hello world" -v Heart
 
 ---
 
-## Commands
+## Documentation
 
-See the [full CLI documentation](https://github.com/chrisjrex/voice-to-text-raycast/blob/main/packages/cli/README.md) for all commands and options.
+For complete documentation, see the [docs](../../docs/) directory:
 
-Common commands:
-- `voicekit transcribe` - Record and transcribe speech
-- `voicekit speak [text]` - Text-to-speech
-- `voicekit models list/download/delete` - Manage STT models
-- `voicekit voices list/download/delete` - Manage TTS voices
-- `voicekit doctor` - Check system health
-- `voicekit help-all` - Show comprehensive help
+- [Quick Start](../../docs/quickstart.md) - Get up and running in minutes
+- [Installation Guide](../../docs/installation.md) - Detailed installation instructions
+- [Configuration](../../docs/configuration.md) - Environment variables and customization
+- [Usage Guide](../../docs/usage.md) - Complete command reference
+- [Troubleshooting](../../docs/help/troubleshooting.md) - Common issues and solutions
+- [Comparison](../../docs/help/comparison.md) - Compare installation methods
 
----
+### Feature Documentation
+- [Transcribe](../../docs/features/transcribe.md) - Speech-to-text
+- [Speak](../../docs/features/speak.md) - Text-to-speech
+- [Models](../../docs/features/models.md) - Manage STT models
+- [Voices](../../docs/features/voices.md) - Manage TTS voices
+- [Server](../../docs/features/server.md) - Background server
 
-## Troubleshooting
-
-**Issue:** `voicekit doctor` shows missing dependencies
-- **Solution:** Install prerequisites listed above
-
-**Issue:** Daemon not visible in Activity Monitor
-- **Solution:** Install setproctitle: `pip3 install setproctitle`
-
-**Issue:** Kokoro voice download fails
-- **Solution:** Ensure `VOICEKIT_KOKORO_PYTHON_PATH` points to Python 3.10-3.12
-
-**Issue:** Permission denied errors
-- **Solution:** Ensure data directory is writable: `mkdir -p ~/.local/share/voicekit`
-
-**Issue:** Want to switch from lite to bundled version
-- **Solution:** `npm uninstall -g @voicekit/cli-lite && npm install -g @voicekit/cli`
+### Reference
+- [Available Models](../../docs/reference/models.md) - Complete model list
+- [Available Voices](../../docs/reference/voices.md) - Complete voice list
+- [Environment Variables](../../docs/reference/environment.md) - All config options
+- [File Locations](../../docs/reference/files.md) - Where data is stored
+- [Speed Control](../../docs/reference/speed.md) - Adjusting speech speed
+- [Piping & Scripting](../../docs/reference/scripting.md) - Using in scripts
 
 ---
 
@@ -223,6 +165,8 @@ For Homebrew:
 ```bash
 brew uninstall voicekit-lite
 ```
+
+For complete uninstall instructions, see [Uninstalling](../../docs/help/uninstalling.md).
 
 ---
 
